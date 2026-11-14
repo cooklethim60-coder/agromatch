@@ -1,13 +1,13 @@
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    DATABASE_PATH=storage/agromatch.db
+    DATABASE_PATH=/app/storage/agromatch.db
 WORKDIR /app
 COPY backend/requirements.txt /app/backend/requirements.txt
 RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 COPY backend /app/backend
 COPY frontend /app/frontend
-COPY storage /app/storage
+# GitHub does not track empty storage directories; create them in the image.
 RUN mkdir -p /app/storage/audio
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--app-dir", "backend", "--host", "0.0.0.0", "--port", "8000"]
