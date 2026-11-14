@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Header, WebSocket, WebSocketDisconne
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel, Field, field_validator
-import env, music, ai, rotation, agro_services, appeears, knowledge, nasa_intelligence
+import env, music, ai, rotation, agro_services, appeears, knowledge, nasa_intelligence, nasa_access
 import csv, io, html
 
 DB = ROOT / os.getenv("DATABASE_PATH", "agromatch.db"); AUDIO = ROOT / "storage" / "audio"; AUDIO.mkdir(parents=True, exist_ok=True)
@@ -72,6 +72,11 @@ def me(authorization: str = Header(None)):
 def need_farm(u):
     if not u["farm"]: raise HTTPException(400, "Register your farm first")
     return u["farm"]["id"]
+
+@app.get("/api/nasa/diagnostics")
+async def nasa_diagnostics(u=Depends(me)):
+    """Authenticated connectivity check; never returns credentials."""
+    return await nasa_access.connectivity()
 
 # ---------- farms & fields ----------
 class FarmIn(BaseModel):

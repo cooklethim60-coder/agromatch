@@ -22,6 +22,8 @@ async def bearer():
     # AppEEARS tokens are different from ordinary Earthdata bearer tokens.
     explicit = os.getenv('APPEEARS_TOKEN','').strip()
     if explicit and not explicit.startswith('your-'): return explicit
+    # EARTHDATA_TOKEN is an EDL token, NOT an AppEEARS task API token.
+    # Do not send it to AppEEARS: the two tokens are not interchangeable.
     user = os.getenv('EARTHDATA_USERNAME','').strip(); password=os.getenv('EARTHDATA_PASSWORD','').strip()
     if not user or not password or password.startswith('your-'):
         raise ConfigError('Configure EARTHDATA_USERNAME/EARTHDATA_PASSWORD or APPEEARS_TOKEN on the server')
@@ -63,6 +65,9 @@ async def submit_point(lat,lon,field_id,start,end,chosen_layers=None):
     payload={"task_type":"point", "task_name":f"AgroMatch-field-{field_id}-{dt.date.today().isoformat()}",
              "params":{"dates":[{"startDate":start.strftime('%m-%d-%Y'),"endDate":end.strftime('%m-%d-%Y')}],
                        "layers":layers,"coordinates":[{"id":str(field_id),"latitude":lat,"longitude":lon}]}}
+    # Validate all configured layers against live NASA metadata before task submission.
+    for entry in layers:
+        await validate_layer(entry['product'], entry['layer'])
     r=await request('POST','/task',payload=payload)
     return r.json(), layers
 

@@ -19,3 +19,9 @@ Runtime: Docker; Dockerfile path: `./Dockerfile`; health check path: `/health`; 
 
 ### Security
 Do not commit `.env`, credentials, `.db`, WAV artifacts or private user data. Rotate any credentials previously included in a ZIP. Render Free has no persistent disks, so it is not suitable for persistent SQLite without external database migration.
+
+## NASA credentials (important)
+The Earthdata Login bearer token you created is **not** an AppEEARS task token.
+In Render > Environment, set `EARTHDATA_TOKEN` to a **newly rotated** EDL token if using EDL-authenticated downloads. Do not put any token in the ZIP, GitHub, `.env.example`, or chat.
+For AppEEARS point tasks, configure `EARTHDATA_USERNAME` and `EARTHDATA_PASSWORD` **directly in Render**, or provide an AppEEARS-issued `APPEEARS_TOKEN` (short-lived). The backend calls the AppEEARS `/login` endpoint when credentials are present.
+After logging in to AgroMatch, GET `/api/nasa/diagnostics` with the session bearer token to inspect connectivity without revealing secrets. This only checks reachability, not the correctness of satellite measurements.
