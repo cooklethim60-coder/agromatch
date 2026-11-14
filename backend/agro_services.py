@@ -8,8 +8,8 @@ async def forecast(lat, lon):
     key = (round(lat, 2), round(lon, 2)); hit = _cache.get(key)
     if hit and time.time() - hit[0] < 900: return hit[1]
     params = {"latitude": lat, "longitude": lon, "timezone": "auto", "forecast_days": 7,
-              "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weather_code",
-              "hourly": "soil_moisture_9_to_27cm"}
+              "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weather_code,wind_speed_10m_max",
+              "hourly": "soil_moisture_9_to_27cm,relative_humidity_2m"}
     async with httpx.AsyncClient(timeout=16) as c:
         r = await c.get("https://api.open-meteo.com/v1/forecast", params=params)
         r.raise_for_status(); obj = r.json()
@@ -21,8 +21,12 @@ async def forecast(lat, lon):
     if not records: raise ValueError('Weather provider returned no forecast days')
     hourly = obj.get('hourly', {})
     wet = [v for v in hourly.get('soil_moisture_9_to_27cm', [])[:24] if isinstance(v, (int, float))]
+    humidity = [v for v in hourly.get("relative_humidity_2m", [])[:24] if isinstance(v, (int, float))]
+    winds = [v for v in d.get("wind_speed_10m_max", [])[:1] if isinstance(v, (int, float))]
     output = {"source": "Open-Meteo forecast model", "kind": "FORECAST", "fetched_at": time.time(),
               "timezone": obj.get('timezone'), "days": records,
+              "humidity_today": round(sum(humidity)/len(humidity)) if humidity else None,
+              "wind_today": round(winds[0], 1) if winds else None,
               "modelled_soil_moisture": round(sum(wet)/len(wet), 3) if wet else None,
               "warnings": weather_warnings(records), "limitations": "Weather model, not a field sensor. Soil moisture is modelled and may be unavailable."}
     _cache[key] = (time.time(), output)
