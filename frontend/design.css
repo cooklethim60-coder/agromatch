@@ -66,3 +66,29 @@ h1{font-size:27px;line-height:1.15;font-weight:730;letter-spacing:-.6px}h2{lette
 .sym-option{display:flex;align-items:center;gap:8px;padding:11px;background:var(--sage2);border:1px solid var(--line);border-radius:11px;cursor:pointer;color:var(--ink);font-size:12px;font-weight:600}
 .sym-option input{width:16px;accent-color:#2E6243;margin:0}
 @media(min-width:720px){.option-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+
+/* Numeric, responsive field weather dashboard */
+.weather-dashboard{max-width:1150px}
+.weather-toolbar{display:flex;align-items:end;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.weather-toolbar label{display:block}
+.weather-toolbar select{min-width:230px}
+.weather-head{margin:12px 0}.weather-head h2{margin:4px 0}
+.weather-head p{margin:0}
+.weather-filters{display:flex;align-items:center;gap:6px;margin:12px 0}
+.weather-filters>span{color:var(--mut);font-size:12px;margin-right:8px}
+.weather-filters button{margin:0}
+.weather-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin:14px 0 24px}
+.weather-kpi{display:flex;flex-direction:column;justify-content:space-between;gap:7px;padding:15px;background:var(--sage2);border:1px solid var(--line);border-radius:14px;min-width:0}
+.weather-kpi-label{font-size:12px;color:var(--ink);font-weight:650}
+.weather-kpi strong{font-size:clamp(20px,3vw,31px);line-height:1.15;color:var(--ink);font-variant-numeric:tabular-nums}
+.weather-kpi small{font-size:11px;color:var(--mut)}
+.weather-symbol{font-size:23px;line-height:1.3}.weather-symbol-sm{font-size:18px}
+.weather-table-wrap{overflow:auto;max-width:100%;border:1px solid var(--line);border-radius:13px;margin:10px 0 23px}
+.weather-data-table{border-collapse:collapse;width:100%;min-width:610px;font-size:13px;font-variant-numeric:tabular-nums}
+.weather-data-table th,.weather-data-table td{text-align:left;padding:12px 13px;border-bottom:1px solid var(--line);white-space:nowrap}
+.weather-data-table th{background:var(--sage2);font-weight:700;font-size:12px;position:sticky;top:0}
+.weather-data-table tbody tr:nth-child(even){background:var(--sage2)}
+.weather-data-table tbody tr:last-child td{border-bottom:0}
+.weather-history{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(min-width:730px){.weather-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.weather-history{grid-template-columns:repeat(3,minmax(0,1fr))}}
