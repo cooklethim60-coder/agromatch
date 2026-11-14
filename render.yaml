@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: agromatch
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_PATH
+        value: /app/storage/agromatch.db
+      - key: MUSIC_PROVIDER
+        value: procedural
+    disk:
+      name: agromatch-storage
+      mountPath: /app/storage
+      sizeGB: 1

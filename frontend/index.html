@@ -1,0 +1,35 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>AgroMatch</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
+<style>
+:root{--bg:#FBF8F1;--card:#fff;--ink:#1d2b22;--mut:#6b766e;--pri:#1F4D36;--sage:#A9BFA8;--sage2:#E6EDE4;--line:#E7E5DE;--warn:#B7791F;--bad:#B4452F}
+[data-theme=dark]{--bg:#141a16;--card:#1d261f;--ink:#eef2ec;--mut:#9aa89d;--pri:#6FB38B;--sage:#4a6350;--sage2:#26332a;--line:#2f3b32}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,Inter,"Segoe UI",Roboto,sans-serif;display:flex;justify-content:center}
+#app{width:100%;max-width:430px;height:100%;position:relative;display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
+#main{flex:1;overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 20px}
+h1{font-size:23px;margin:0}h2{font-size:17px;margin:18px 0 8px}h3{font-size:15px;margin:0}.mut{color:var(--mut);font-size:13px}.row{display:flex;align-items:center;gap:10px}.sb{justify-content:space-between}.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px #0000000a}
+.btn{background:var(--pri);color:#fff;border:0;border-radius:14px;padding:13px 16px;font:600 15px inherit;width:100%;cursor:pointer}.btn.o{background:transparent;color:var(--pri);border:1.5px solid var(--pri)}.btn.s{padding:8px 12px;width:auto;font-size:13px;border-radius:11px}.btn:disabled{opacity:.5}
+.chip{display:inline-block;padding:5px 11px;border-radius:99px;background:var(--sage2);color:var(--pri);font:600 12px inherit;margin:0 6px 6px 0;border:0;cursor:pointer}.chip.on{background:var(--pri);color:#fff}
+.tag{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:6px;display:inline-block}.n{background:#DCEBDD;color:#1F4D36}.s_{background:#FCEFD0;color:#8a5a00}.f_{background:#E3E8F5;color:#2c3f7a}.a_{background:#EBDDF3;color:#5a2f77}
+input,select,textarea{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;margin:4px 0 10px}label{font-size:12.5px;font-weight:600;color:var(--mut)}
+nav{display:flex;background:var(--card);border-top:1px solid var(--line);padding:5px 2px calc(env(safe-area-inset-bottom,0px) + 5px)}nav button{flex:1;border:0;background:none;color:var(--mut);font:600 10.5px inherit;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 0;cursor:pointer}nav button.on{color:var(--pri)}
+svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.ic{background:none;border:0;color:var(--ink);padding:6px;cursor:pointer}
+.over{position:absolute;inset:0;background:var(--bg);z-index:20;overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 90px}
+.map{width:100%;height:240px;border-radius:14px;overflow:hidden;margin:8px 0}.map.big{height:calc(100vh - 330px);min-height:300px}
+.metric{background:var(--sage2);border-radius:13px;padding:9px}.metric b{font-size:19px;display:block}
+.bar{height:8px;background:var(--sage2);border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:var(--pri)}
+.warn{font-size:12px;background:#FCEFD0;color:#8a5a00;border-radius:11px;padding:8px 10px;margin:8px 0}
+.seg{display:flex;gap:4px;background:var(--sage2);border-radius:12px;padding:3px;margin-bottom:12px;overflow-x:auto}.seg button{flex:1;border:0;background:none;color:var(--ink);padding:8px 10px;border-radius:10px;font:600 13px inherit;white-space:nowrap;cursor:pointer}.seg button.on{background:var(--card);color:var(--pri);box-shadow:0 1px 3px #0002}
+.swipe{position:relative;min-height:470px}.sc{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:14px;touch-action:pan-y;box-shadow:0 8px 24px #0001;cursor:grab}
+.act{display:flex;justify-content:center;gap:28px;margin-top:12px}.act button{width:58px;height:58px;border-radius:50%;border:1.5px solid var(--line);background:var(--card);cursor:pointer;color:var(--ink)}.act .y{background:var(--pri);color:#fff;border:0}
+.bub{padding:9px 12px;border-radius:16px;margin:5px 0;max-width:85%;background:var(--sage2)}.bub.u{background:var(--pri);color:#fff;margin-left:auto}.bub small{display:block;opacity:.65;font-size:10.5px;margin-top:2px}
+.rot{display:flex;gap:4px;flex-wrap:wrap}.rot span{background:var(--sage2);border-radius:8px;padding:3px 8px;font-size:12px;font-weight:600;text-transform:capitalize}
+.dot{background:#B4452F;color:#fff;border-radius:99px;font-size:11px;padding:1px 7px;font-weight:700}
+#player{display:none;position:absolute;left:10px;right:10px;bottom:72px;z-index:30;background:var(--pri);color:#fff;border-radius:16px;padding:9px 12px;box-shadow:0 6px 20px #0004}#player canvas{width:100%;height:26px;display:block}#player input{margin:0;padding:0;background:none;border:0}
+.toast{position:absolute;left:50%;bottom:130px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 15px;border-radius:12px;font-size:13px;z-index:40;max-width:90%}
+.dots i{display:inline-block;width:8px;height:8px;border-radius:9px;background:var(--sage);margin:0 3px}.dots i.on{width:22px;background:var(--pri)}
+.md p{margin:6px 0}.chk{display:flex;gap:8px;padding:6px 0}.chk input{width:18px;margin:2px 0}
+</style><link rel="stylesheet" href="/static/design.css"></head><body><div id="app"><div id="main"></div><div id="player"><div class="row sb"><b id="pt" style="font-size:13px"></b><span><button class="ic" id="pp" style="color:#fff">▶</button><button class="ic" id="px" style="color:#fff">✕</button></span></div><canvas id="pc"></canvas><div class="row"><input id="ps" type="range" min="0" max="1000" value="0"><input id="pv" type="range" min="0" max="100" value="80" style="width:70px" title="Volume"></div></div></div>
+<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script><script src="/static/features.js"></script><script src="/static/app.js"></script></body></html>
