@@ -33,9 +33,74 @@ async function loadAiDoctor(){const el=$('#aiDoctorResult');if(!el)return;el.inn
  try{const r=await api(`/fields/${S.extraField}/doctor/ai`,{b:{}});
   if($('#aiDoctorResult'))$('#aiDoctorResult').innerHTML=`<div class="feature-panel"><span class="tag a_">AI INTERPRETATION</span><p class="mut">${esc(r.provider)} · Not a field measurement or diagnosis</p><div class="md">${md(r.text)}</div></div>`;
  }catch(e){if($('#aiDoctorResult'))$('#aiDoctorResult').innerHTML=`<div class="warn">${esc(e.message)}. Configure Gemini / Grok keys on the backend.</div>`}}
-function weatherPage(){ensureField();return hdr('Weather & Climate','Seven-day forecast · historical NASA climate')+`<div class="feature-panel">${selFieldHtml('loadWeather')}<div id="weatherResults" class="loading-region">Requesting weather forecast…</div></div>`}
-async function loadWeather(){const el=$('#weatherResults');if(!el)return;el.innerHTML='<p class="mut">Loading Open-Meteo forecast…</p>';try{const w=await api(`/fields/${S.extraField}/weather`);if(!$('#weatherResults'))return;const f=S.me.fields.find(z=>z.id===S.extraField),m=f.snapshots[0]?.metrics;el.innerHTML=`<div class="row sb"><b>Next 7 days</b><span class="tag f_">FORECAST</span></div><div class="weather-week">${w.days.map(d=>`<div class="weather-day"><small>${esc(d.date.slice(5))}</small><strong>${Math.round(d.high)}°</strong><span>${Math.round(d.low)}° low</span><b>${Math.round(d.rain||0)} mm</b><small>${Math.round(d.rain_chance||0)}% rain</small></div>`).join('')}</div><div class="row sb" style="margin:14px 0"><b>Precipitation outlook</b><span class="mut">mm per day</span></div>${bars(w.days.map(d=>d.rain||0),w.days.map(d=>d.date.slice(8)))}<h2>Weather warnings</h2>${w.warnings.length?w.warnings.map(z=>`<div class="finding warning"><b>${esc(z.kind)}</b> ${z.date?'· '+esc(z.date):''}<p>${esc(z.text)}</p></div>`).join(''):'<p class="mut">No thresholds exceeded in the current forecast.</p>'}<h2>NASA POWER · historical context</h2>${m?`<div class="key-stats"><span>Annual precipitation <b>${m.rain_mm} mm</b></span><span>Average temperature <b>${m.temp_c}°C</b></span><span>Modelled wetness <b>${m.wetness}</b></span></div>${line((m.monthly||[]).slice(-12).map(a=>a.temp),(m.monthly||[]).slice(-12).map(a=>a.m.slice(5)),'var(--pri)')}<p class="mut">${esc(m.source)} ${m.simulated?tag('s'):tag('n')}</p>`:''}<div class="footnote">${esc(w.source)} • Updated ${new Date(w.fetched_at*1000).toLocaleString()} • ${esc(w.limitations)} ${w.modelled_soil_moisture==null?'Modelled soil moisture unavailable.':''}</div>`;
-}catch(e){if($('#weatherResults'))$('#weatherResults').innerHTML=`<div class="warn">Forecast unavailable: ${esc(e.message)}. Existing NASA POWER history remains in field profiles.</div>`}}
+function weatherPage(){
+ ensureField();
+ return hdr('Weather & Climate','Погода на поле · прогноз с числами и таблицей')+
+ `<div class="feature-panel weather-dashboard">
+ <div class="weather-toolbar">${selFieldHtml('loadWeather')}
+ <button class="btn o s" onclick="loadWeather()" title="Update data">↻ Обновить прогноз</button></div>
+ <div id="weatherResults" class="loading-region" aria-live="polite">Загружаем прогноз погоды…</div></div>`;
+}
+function weatherNum(x,digits=0,suffix=''){
+ const n=Number(x);return x==null||!Number.isFinite(n)?'—':n.toLocaleString('ru-RU',{maximumFractionDigits:digits,minimumFractionDigits:digits})+suffix;
+}
+function weatherIcon(code){
+ const c=Number(code);
+ return c===0?'☀️':c>=1&&c<=3?'⛅':c>=45&&c<=48?'🌫️':c>=51&&c<=67?'🌧️':c>=71&&c<=77?'❄️':c>=80&&c<=82?'🌦️':c>=95?'⛈️':'🌤️';
+}
+function weatherDate(d){const date=new Date(d+'T12:00:00');return Number.isNaN(date.getTime())?esc(d):date.toLocaleDateString('ru-RU',{weekday:'short',day:'numeric',month:'short'});}
+function renderWeatherDashboard(){
+ const w=S.weatherData,el=$('#weatherResults');
+ if(!w||!el)return;
+ const days=w.days.slice(0,S.weatherRange===3?3:7);
+ const f=S.me.fields.find(z=>z.id===S.extraField);
+ const m=f?.snapshots?.[0]?.metrics;
+ const sum=k=>days.reduce((a,d)=>a+(Number.isFinite(Number(d[k]))&&d[k]!=null?Number(d[k]):0),0);
+ const validHigh=days.filter(d=>d.high!=null).map(d=>Number(d.high));
+ const high=validHigh.length?Math.max(...validHigh):null;
+ const lows=days.filter(d=>d.low!=null).map(d=>Number(d.low));
+ const low=lows.length?Math.min(...lows):null;
+ const chance=days.filter(d=>d.rain_chance!=null).map(d=>Number(d.rain_chance));
+ const chanceMax=chance.length?Math.max(...chance):null;
+ const card=(symbol,title,value,note)=>`<div class="weather-kpi"><span class="weather-kpi-label">${symbol} ${title}</span><strong>${value}</strong><small>${note}</small></div>`;
+ el.innerHTML=`<div class="row sb weather-head"><div><div class="section-eyebrow">OPEN-METEO · ПРОГНОЗ</div><h2>${esc(f?.name||'Поле')}</h2><p class="mut">По координатам поля · ${esc(w.timezone||'часовой пояс модели')}</p></div><span class="tag f_">FORECAST</span></div>
+ <div class="weather-filters" role="group" aria-label="Период прогноза"><span>Показать:</span><button class="chip ${S.weatherRange===3?'on':''}" onclick="S.weatherRange=3;renderWeatherDashboard()">3 дня</button><button class="chip ${S.weatherRange!==3?'on':''}" onclick="S.weatherRange=7;renderWeatherDashboard()">7 дней</button></div>
+ <div class="weather-kpis">
+ ${card('🌡️','Макс. температура',weatherNum(high,1,' °C'),'За выбранный период')}
+ ${card('❄️','Мин. температура',weatherNum(low,1,' °C'),'За выбранный период')}
+ ${card('🌧️','Всего осадков',weatherNum(sum('rain'),1,' мм'),'Сумма за '+days.length+' дн.')}
+ ${card('☔','Вероятность дождя',weatherNum(chanceMax,0,' %'),'Максимум за период')}
+ ${card('💧','Влажность воздуха',weatherNum(w.humidity_today,0,' %'),'Прогноз на сегодня')}
+ ${card('💨','Ветер',weatherNum(w.wind_today,1,' км/ч'),'Макс. за сегодня')}
+ </div>
+ <h2>Прогноз по дням</h2><div class="weather-week">${days.map(d=>`<div class="weather-day"><small>${weatherDate(d.date)}</small><div class="weather-symbol">${weatherIcon(d.code)}</div><strong>${weatherNum(d.high,0,'°')}</strong><span>мин. ${weatherNum(d.low,0,'°')}</span><b>${weatherNum(d.rain,1,' мм')}</b><small>☔ ${weatherNum(d.rain_chance,0,'%')}</small></div>`).join('')}</div>
+ <div class="row sb"><h2>Таблица погодных условий</h2><span class="mut">Обновляется при выборе поля</span></div>
+ <div class="weather-table-wrap"><table class="weather-data-table"><thead><tr><th>Дата</th><th>Условия</th><th>Макс., °C</th><th>Мин., °C</th><th>Осадки, мм</th><th>Вероятность, %</th></tr></thead><tbody>${days.map(d=>`<tr><td>${weatherDate(d.date)}</td><td class="weather-symbol-sm">${weatherIcon(d.code)}</td><td>${weatherNum(d.high,1)}</td><td>${weatherNum(d.low,1)}</td><td>${weatherNum(d.rain,1)}</td><td>${weatherNum(d.rain_chance)}</td></tr>`).join('')}</tbody></table></div>
+ <h2>Осадки по дням (мм)</h2>${bars(days.map(d=>Number(d.rain)||0),days.map(d=>d.date.slice(8)))}
+ <h2>Предупреждения</h2>${w.warnings?.length?w.warnings.filter(z=>!z.date||days.some(d=>d.date===z.date)).map(z=>`<div class="finding warning"><b>${esc(z.kind)}</b> ${z.date?'· '+weatherDate(z.date):''}<p>${esc(z.text)}</p></div>`).join(''):'<p class="mut">По заданным порогам предупреждений нет. Это не гарантия отсутствия риска.</p>'}
+ <h2>NASA POWER · климатическая история</h2>${m?`<div class="weather-kpis weather-history">
+ ${card('🌧️','Осадки за год',weatherNum(m.rain_mm,0,' мм'),'Исторический региональный показатель')}
+ ${card('🌡️','Средняя температура',weatherNum(m.temp_c,1,' °C'),'Исторический региональный показатель')}
+ ${card('🌱','Влажность почвы',weatherNum(m.wetness,3),'Модельная, без единиц измерения')}
+ </div>${(m.monthly||[]).length>1?line((m.monthly||[]).slice(-12).map(a=>a.temp),(m.monthly||[]).slice(-12).map(a=>a.m.slice(5)),'var(--pri)'):''}
+ <p class="mut">Источник: ${esc(m.source||'не указан')} ${m.simulated?tag('s'):tag('n')}</p>`:'<p class="mut">Нет исторических измерений для этого поля.</p>'}
+ <div class="footnote">Прогноз: ${esc(w.source)} · получен ${new Date(w.fetched_at*1000).toLocaleString('ru-RU')} · ${esc(w.limitations)}. Погодные прогнозы не являются измерениями датчиков на поле.</div>`;
+}
+async function loadWeather(){
+ const el=$('#weatherResults');if(!el)return;
+ const fid=S.extraField;
+ S.weatherData=null;
+ el.innerHTML='<p class="mut">Получаем свежий прогноз погоды…</p>';
+ try{
+  const w=await api(`/fields/${fid}/weather`);
+  if(S.extraField!==fid||!$('#weatherResults'))return;
+  S.weatherData=w;
+  S.weatherRange=S.weatherRange===3?3:7;
+  renderWeatherDashboard();
+ }catch(e){
+  if($('#weatherResults')&&S.extraField===fid)$('#weatherResults').innerHTML=`<div class="warn">Не удалось загрузить прогноз: ${esc(e.message)}. Проверь подключение к Open-Meteo и попробуй обновить данные.</div>`;
+ }
+}
 function feedPage(){return hdr('Farm Feed','From the fields, to the community')+`<div class="feature-panel"><div class="section-eyebrow">SHARE AN UPDATE</div><textarea id="newpost" maxlength="2000" rows="3" placeholder="A field observation, crop-rotation idea, or a practical question…"></textarea><div class="row sb"><span class="mut">Visible to AgroMatch members</span><button class="btn s" onclick="publishPost()">Publish</button></div></div><div id="feedResults" class="loading-region">Loading community posts…</div>`}
 async function loadFeed(){const el=$('#feedResults');if(!el)return;el.innerHTML='<p class="mut">Loading posts…</p>';try{const items=await api('/feed');S.feed=items;renderFeed()}catch(e){el.innerHTML=`<div class="warn">${esc(e.message)}</div>`}}
 function renderFeed(){const el=$('#feedResults');if(!el)return;el.innerHTML=(S.feed||[]).length?(S.feed||[]).map(p=>`<article class="social-post"><div class="row sb"><div><b>${esc(p.author)}</b><div class="mut">${esc(p.region)} · ${when(p.created)}</div></div><span class="tag f_">FARMER</span></div><p>${esc(p.body).replace(/\n/g,'<br>')}</p><div class="post-actions"><button class="chip ${p.liked?'on':''}" onclick="likePost(${p.id})">${p.liked?'♥':'♡'} ${p.likes} likes</button><span class="mut">${p.comments.length} comments</span></div>${p.comments.map(c=>`<div class="post-comment"><b>${esc(c.author)}</b> ${esc(c.body)}<small>${when(c.created)}</small></div>`).join('')}<div class="row"><input id="comment-${p.id}" maxlength="1000" placeholder="Comment on this update" onkeydown="if(event.key==='Enter')addComment(${p.id})"><button class="btn s" onclick="addComment(${p.id})">Reply</button></div></article>`).join(''):'<div class="feature-panel"><h2>No posts yet</h2><p class="mut">Start the conversation with a field observation or useful farming tip.</p></div>'}
