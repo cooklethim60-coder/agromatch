@@ -390,3 +390,20 @@ button{font-family:inherit}
 .earth-opacity-control input[type=range]{display:block;width:150px;accent-color:#3c7c57;margin:4px 0;box-shadow:none;padding:0;border:0;min-width:80px}
 .earth-options>.btn{margin-left:auto}
 @media(max-width:700px){.earth-options>.btn{margin-left:0}.earth-opacity-control{max-width:185px}.earth-opacity-control input[type=range]{width:130px}}
+
+/* Overview weather and farmer activity */
+.home-weather-summary{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 0}
+.home-weather-current{display:flex;flex-direction:column;gap:4px;min-width:120px}
+.home-weather-current .weather-symbol{font-size:28px}
+.home-weather-current strong{font-size:27px;font-weight:800;letter-spacing:-.04em;line-height:1.1}
+.home-weather-current small,.home-weather-metrics span{font-size:10px;color:var(--mut)}
+.home-weather-metrics{display:flex;flex:1;flex-direction:column;gap:10px;border-left:1px solid var(--line);padding-left:16px}
+.home-weather-metrics span{display:flex;flex-direction:column;gap:4px}
+.home-weather-metrics b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}
+.home-weather-note{font-size:11px;line-height:1.6;color:var(--mut);margin:11px 0 5px}
+.home-weather-source{font-size:9px;letter-spacing:.06em;color:#759682;font-weight:750;margin:11px 0 0}
+.command-feed-item{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.command-feed-item:first-child{border-top:0}
+.command-feed-avatar{height:32px;width:32px;flex:0 0 32px;display:grid;place-items:center;border-radius:10px;background:var(--sage2);color:var(--pri);font-size:14px;font-weight:800}
+.command-feed-item b{font-size:11px}
+.command-feed-item p{font-size:11px;color:var(--mut);line-height:1.55;margin:2px 0 0;overflow-wrap:anywhere}
