@@ -17,7 +17,7 @@ def contains_point(lon, lat, ring):
     points = [(_delta_lon(x, lon), y) for x, y in ring]
     inside = False
     for (x1, y1), (x2, y2) in zip(points, points[1:] + points[:1]):
-        cross = x1 * (y2 - y1) - (0.0 - y1) * (x2 - x1)
+        cross = (-x1) * (y2 - y1) - (lat - y1) * (x2 - x1)
         if abs(cross) <= 1e-10 and min(x1, x2)-1e-9 <= 0 <= max(x1,x2)+1e-9 and min(y1,y2)-1e-9 <= lat <= max(y1,y2)+1e-9:
             return True
         if (y1 > lat) != (y2 > lat):
