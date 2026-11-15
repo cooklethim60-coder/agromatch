@@ -220,9 +220,18 @@ function downloadPointReport(){
  link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();
  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-function after(){if(S.scr=='fieldEd'){const m=mkMap('fed',{center:S.me.farm?[S.me.farm.lon,S.me.farm.lat]:[0,20],zoom:S.me.farm?15:2,onload:m=>{m.addSource('draw',{type:'geojson',data:geo(S.pts)});m.addLayer({id:'dfill',type:'fill',source:'draw',filter:['==','$type','Polygon'],paint:{'fill-color':'#7CFC9A','fill-opacity':.3}});m.addLayer({id:'dline',type:'line',source:'draw',filter:['==','$type','LineString'],paint:{'line-color':'#fff','line-width':2.5}});m.addLayer({id:'dpt',type:'circle',source:'draw',filter:['==','$type','Point'],paint:{'circle-radius':5,'circle-color':'#1F4D36','circle-stroke-color':'#fff','circle-stroke-width':2}});if(S.edit){const f=S.me.fields.find(x=>x.id==S.edit);if(!S.pts.length)S.pts=f.polygon.slice();upd();fit(m,S.pts)}}});m.on('click',e=>{S.pts.push([e.lngLat.lng,e.lngLat.lat]);upd()});m.getCanvas().style.cursor='crosshair'}
+function after(){
+ if(S.scr==='app'&&S.tab==='home'&&S.me?.fields?.length){
+  const fields=S.me.fields,farm=S.me.farm;
+  mkMap('homeFarmMap',{center:[farm?.lon||fields[0].lon,farm?.lat||fields[0].lat],zoom:11,pitch:0,onload:m=>{
+   addFields(m,fields,id=>ovField(Number(id)));
+   const coords=fields.flatMap(f=>f.polygon||[]);
+   if(coords.length)fit(m,coords);
+  }});
+ }
+ if(S.scr=='fieldEd'){const m=mkMap('fed',{center:S.me.farm?[S.me.farm.lon,S.me.farm.lat]:[0,20],zoom:S.me.farm?15:2,onload:m=>{m.addSource('draw',{type:'geojson',data:geo(S.pts)});m.addLayer({id:'dfill',type:'fill',source:'draw',filter:['==','$type','Polygon'],paint:{'fill-color':'#7CFC9A','fill-opacity':.3}});m.addLayer({id:'dline',type:'line',source:'draw',filter:['==','$type','LineString'],paint:{'line-color':'#fff','line-width':2.5}});m.addLayer({id:'dpt',type:'circle',source:'draw',filter:['==','$type','Point'],paint:{'circle-radius':5,'circle-color':'#1F4D36','circle-stroke-color':'#fff','circle-stroke-width':2}});if(S.edit){const f=S.me.fields.find(x=>x.id==S.edit);if(!S.pts.length)S.pts=f.polygon.slice();upd();fit(m,S.pts)}}});m.on('click',e=>{S.pts.push([e.lngLat.lng,e.lngLat.lat]);upd()});m.getCanvas().style.cursor='crosshair'}
  if(S.scr=='farmSetup'){const f=S.me?.farm,m=mkMap('fmap',{center:f?[f.lon,f.lat]:[0,20],zoom:f?11:1.4});m.on('click',e=>setLoc(e.lngLat.lat,e.lngLat.lng,''));if(f){S.mk=new maplibregl.Marker({color:'#1F4D36'}).setLngLat([f.lon,f.lat]).addTo(m)}}
- if(S.scr=='app'&&S.tab=='earth'){const fs=S.me.fields,c=S.cam;mkMap('earth',{center:c?c.center:fs[0]?[fs[0].lon,fs[0].lat]:[0,20],zoom:c?c.zoom:fs[0]?14:1.5,pitch:c?c.pitch:fs[0]?50:0,onload:m=>{addFields(m,fs,(id,point)=>{const f=fs.find(x=>x.id==id);if(!f)return;loadMapPoint(f.id,point.lat,point.lng)});setLayer(S.layer,$('#ed').value)}});maps.earth.on('moveend',()=>{const m=maps.earth;if(m)S.cam={center:m.getCenter().toArray(),zoom:m.getZoom(),pitch:m.getPitch()}});maps.earth.on('error',e=>{if(e.sourceId=='gibs')$('#einfo')&&0})}
+ if(S.scr=='app'&&S.tab=='earth'){const fs=S.me.fields,c=S.cam;mkMap('earth',{center:c?c.center:fs[0]?[fs[0].lon,fs[0].lat]:[0,20],zoom:c?c.zoom:fs[0]?14:1.5,pitch:c?c.pitch:fs[0]?50:0,onload:m=>{addFields(m,fs,(id,point)=>{const f=fs.find(x=>x.id==id);if(!f)return;loadMapPoint(f.id,point.lat,point.lng)});setLayer(S.layer,$('#ed').value);if(S.earthFocus){const chosen=fs.find(f=>f.id===S.earthFocus);if(chosen?.polygon?.length)fit(m,chosen.polygon);S.earthFocus=null}}});maps.earth.on('moveend',()=>{const m=maps.earth;if(m)S.cam={center:m.getCenter().toArray(),zoom:m.getZoom(),pitch:m.getPitch()}});maps.earth.on('error',e=>{if(e.sourceId=='gibs')$('#einfo')&&0})}
  if(S.scr=='app'&&S.tab=='rot')loadRot();if(S.scr=='app'&&['disc','match'].includes(S.tab))bindSwipe();if(S.scr=='app'&&S.tab=='co')0}
 /* ---------- overlays ---------- */
 function ovOpen(h){closeOv();$('#app').insertAdjacentHTML('beforeend',`<div class="over" id="ov"><div class="row" style="margin-bottom:8px"><button class="ic" onclick="closeOv()">${ic('back')}</button></div>${h}</div>`);S.ov=1}
