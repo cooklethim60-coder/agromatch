@@ -64,12 +64,36 @@ function renderFieldsList(){
  const e=$('#fieldsResults');if(e)e.innerHTML=fieldsListMarkup();
  const count=$('#fieldsVisibleCount');if(count)count.textContent=fieldsFiltered().length;
 }
+function fieldsComparisonHTML(){
+ const fields=S.me?.fields||[],ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b;
+ if(fields.length<2)return `<p class="mut">${t('Добавьте второе поле, чтобы сравнить показатели.','Add a second field to compare indicators.')}</p>`;
+ const ids=fields.map(x=>x.id);if(!ids.includes(S.compareA))S.compareA=ids[0];
+ if(!ids.includes(S.compareB)||S.compareB===S.compareA)S.compareB=ids.find(x=>x!==S.compareA)||ids[1];
+ const a=fields.find(x=>x.id===S.compareA),b=fields.find(x=>x.id===S.compareB);
+ const opts=which=>fields.map(f=>`<option value="${f.id}" ${f.id===which?'selected':''}>${esc(f.name)}</option>`).join('');
+ const val=(m,k,unit='')=>m?.[k]==null?'—':esc(m[k])+unit;
+ const rows=[
+  [t('Площадь','Area'),(f,m)=>Number(f.area_ha||0).toLocaleString(ru?'ru-RU':'en-US')+' ha'],
+  [t('Осадки / период','Period rainfall'),(f,m)=>val(m,'rain_mm',' mm')],
+  [t('Средняя температура','Mean temperature'),(f,m)=>val(m,'temp_c',' °C')],
+  [t('Модельная влажность (0–1)','Modeled wetness (0–1)'),(f,m)=>val(m,'wetness')],
+  [t('Тип почвы','Soil type'),f=>esc(f.soil||'—')],
+  [t('Последние данные','Last available data'),(f,m)=>esc(m?.last_obs||'—')]
+ ];
+ const ma=a.snapshots?.[0]?.metrics,mb=b.snapshots?.[0]?.metrics;
+ const source=m=>m?.simulated?tag('s'):m?.source?tag('n'):'<span class="source-unknown">NO DATA</span>';
+ return `<div class="field-compare-inputs"><label>${t('Поле A','Field A')}<select aria-label="${t('Первое поле','First field')}" onchange="S.compareA=+this.value;renderFieldComparison()">${opts(a.id)}</select></label><label>${t('Поле B','Field B')}<select aria-label="${t('Второе поле','Second field')}" onchange="S.compareB=+this.value;renderFieldComparison()">${opts(b.id)}</select></label></div>
+ <div class="field-compare-scroll"><table class="field-compare-table"><thead><tr><th>${t('Показатель','Indicator')}</th><th>${esc(a.name)}<div>${source(ma)}</div></th><th>${esc(b.name)}<div>${source(mb)}</div></th></tr></thead><tbody>${rows.map(([name,calc])=>`<tr><th>${name}</th><td>${calc(a,ma)}</td><td>${calc(b,mb)}</td></tr>`).join('')}</tbody></table></div>
+ <p class="footnote">${t('Это сравнение не является оценкой урожайности. Периоды данных могут различаться; NASA POWER отражает региональную сетку, а SIMULATED — демонстрационные значения.','Not a yield forecast. Observation periods may differ; NASA POWER is regional grid data and SIMULATED values are demonstrations.')}</p>`;
+}
+function renderFieldComparison(){const e=$('#fieldComparisonResults');if(e)e.innerHTML=fieldsComparisonHTML()}
 function myFields(){
  const ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b,fields=S.me.fields||[];
  return hdr(t('Мои поля','My fields'),t('Контуры, климат, культура и история участков','Boundaries, climate, crops and field histories'))+
  `<div class="fields-management">
  <div class="fields-management-hero"><div><div class="section-eyebrow">${t('ЗЕМЕЛЬНЫЙ БАНК','FIELD PORTFOLIO')}</div><h2>${fields.length} ${t('полей в хозяйстве','fields in your portfolio')}</h2><p>${t('Найдите нужный участок или перейдите к его координатам на карте.','Find any parcel, explore its history or jump to its map location.')}</p></div><div class="fields-management-actions"><button class="btn s" onclick="S.scr='fieldEd';S.edit=null;S.pts=[];draw()">+ ${t('Новое поле','Add field')}</button><button class="btn o s" onclick="downloadFieldsGeoJSON()">↓ GeoJSON</button></div></div>
  <div class="fields-management-toolbar"><label for="fieldSearch">${t('Поиск по названию, почве, культуре','Search fields by name, soil or crop')}<input id="fieldSearch" type="search" placeholder="${t('Например: пшеница','e.g. wheat')}" value="${esc(S.fieldQuery||'')}" oninput="S.fieldQuery=this.value;renderFieldsList()"></label><label for="fieldSort">${t('Сортировка','Sort fields')}<select id="fieldSort" onchange="S.fieldSort=this.value;renderFieldsList()"><option value="name" ${S.fieldSort==='name'||!S.fieldSort?'selected':''}>${t('По названию','Name')}</option><option value="area-desc" ${S.fieldSort==='area-desc'?'selected':''}>${t('Площадь ↓','Area ↓')}</option><option value="area-asc" ${S.fieldSort==='area-asc'?'selected':''}>${t('Площадь ↑','Area ↑')}</option></select></label><span class="fields-result-count"><b id="fieldsVisibleCount">${fieldsFiltered().length}</b> / ${fields.length}</span></div>
+ <details class="field-comparison"><summary><span>◫</span> ${t('Сравнить два поля','Compare two fields')} <small>${t('Региональные условия и история','Regional conditions and history')}</small></summary><div id="fieldComparisonResults">${fieldsComparisonHTML()}</div></details>
  <div class="fields-result-grid" id="fieldsResults">${fieldsListMarkup()}</div>
  <p class="footnote">${t('Климатические показатели NASA POWER имеют региональное разрешение. Данные с пометкой SIMULATED не являются наблюдениями.','NASA POWER climate estimates are regional; SIMULATED values are not observations.')}</p>
  </div>`;
