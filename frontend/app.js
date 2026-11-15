@@ -50,8 +50,46 @@ function tab(t){S.tab=t;draw()}
 async function boot(){try{await load();S.scr=!S.me.farm?'farm':!S.me.fields.length?'field':'app';if(S.scr=='farm')S.scr='farmSetup';if(S.scr=='field')S.scr='fieldEd';connect()}catch(e){S.scr='auth'}draw()}
 async function load(){S.me=await api('/me');if(S.me.farm){S.matches=await api('/matches');S.notif=S.matches.reduce((a,m)=>a+m.unread,0);S.notifN=(await api('/notifications')).filter(n=>!n.is_read).length;try{S.disc=await api('/discover');S.disc.concat(S.matches.map(m=>m.farm)).forEach(c=>S.known[c.id]=c)}catch(e){S.disc=[]}}}
 /* ---------- onboarding / auth ---------- */
-function onb(){const s=[['Know your land from space','NASA Earth observations plus your own field boundaries, soil and crop history build a Field DNA for every field.'],['Find farms like yours','Discover farmers with similar environmental conditions, match, and exchange real experience.'],['Plan, and hear your farm','Compare crop rotations, stress-test them with Climate Remix, get an AI action plan—and listen to your Farm Symphony.']][S.ob];return`<div style="display:flex;flex-direction:column;justify-content:space-between;min-height:92vh"><div class="row sb"><b style="color:var(--pri)">AgroMatch</b><button class="ic mut" onclick="S.scr='auth';draw()">Skip</button></div><div><h1 style="font-size:28px">${s[0]}</h1><p class="mut" style="font-size:15px">${s[1]}</p></div><div><div class="dots" style="text-align:center;margin:12px">${[0,1,2].map(i=>`<i class="${i==S.ob?'on':''}"></i>`).join('')}</div><button class="btn" onclick="S.ob<2?S.ob++:S.scr='auth';draw()">${S.ob<2?'Continue':'Get started'}</button></div></div>`}
-function auth(){const r=S.auth=='register';return`<h1 style="margin-top:30px">${r?'Create account':'Welcome back'}</h1><p class="mut">${r?'Your data is stored in this app’s local database.':'Sign in to your farm.'}</p>${r?'<label>Name</label><input id="nm">':''}<label>Email</label><input id="em" type="email" autocomplete="email"><label>Password (6+ characters)</label><input id="pw" type="password"><button class="btn" onclick="doAuth()">${r?'Sign up':'Log in'}</button><p class="mut" style="text-align:center" onclick="S.auth='${r?'login':'register'}';draw()"><u>${r?'I already have an account':'Create a new account'}</u></p>`}
+function onb(){
+ const ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b;
+ const slides=ru?[
+  ['Земля под вашим контролем.','Сохраняйте контуры полей, изучайте спутниковые слои и проверяйте климатические условия для каждой выбранной точки.'],
+  ['Решения на основе данных.','Погода, региональные показатели NASA и прозрачные рекомендации — с указанием источников и ограничений.'],
+  ['Растите вместе.','Общайтесь с фермерами, сравнивайте севообороты и задавайте вопросы AI-агроному.']
+ ]:[
+  ['Your land, in focus.','Save field boundaries, inspect satellite layers and explore conditions at selected field coordinates.'],
+  ['Decisions with evidence.','Weather, regional NASA data and transparent recommendations — each with its source and limits.'],
+  ['Grow together.','Connect with farmers, compare rotations and ask the AI agronomist for guidance.']
+ ];
+ const slide=slides[S.ob]||slides[0];
+ return `<div class="welcome-shell">
+  <div class="welcome-top"><div class="welcome-logo"><span class="welcome-mark">A</span><span><b>AGROMATCH</b><small>EARTH INTELLIGENCE</small></span></div><button class="mini-link" onclick="S.scr='auth';draw()">${t('Пропустить','Skip')} ↗</button></div>
+  <div class="welcome-stage">
+   <div class="welcome-art" aria-hidden="true"><div class="welcome-globe"><span class="welcome-globe-glow">✦</span><i></i><i></i><i></i></div><div class="welcome-float-label">43.24° N, 76.92° E <span>·</span> EARTH DATA</div></div>
+   <div class="welcome-copy"><span class="welcome-kicker">0${S.ob+1} / 03 · ${t('СЕРВИС ДЛЯ ФЕРМЕРОВ','BUILT FOR GROWERS')}</span><h1>${slide[0]}</h1><p>${slide[1]}</p><div class="welcome-progress">${slides.map((_,i)=>`<i class="${i===S.ob?'active':''}"></i>`).join('')}</div><button class="btn" onclick="S.ob<2?S.ob++:S.scr='auth';draw()">${S.ob===2?t('Начать работу','Get started'):t('Продолжить','Continue')} <span aria-hidden="true">→</span></button><p class="welcome-source">${t('NASA POWER · Open-Meteo · спутниковые изображения','NASA POWER · Open-Meteo · satellite imagery')}</p></div>
+  </div>
+ </div>`;
+}
+function auth(){
+ const r=S.auth==='register',ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b;
+ return `<div class="auth-shell"><aside class="auth-story">
+  <div class="welcome-logo"><span class="welcome-mark">A</span><span><b>AGROMATCH</b><small>EARTH INTELLIGENCE</small></span></div>
+  <div class="auth-story-middle"><span class="welcome-kicker">${t('ЗЕМЛЯ · ДАННЫЕ · РЕШЕНИЯ','LAND · DATA · DECISIONS')}</span><h2>${t('Лучше понимать каждое поле.','See every field more clearly.')}</h2><p>${t('Сохраняйте поля и получайте прозрачную картину погоды, климата и спутниковых данных.','Bring field boundaries, satellite context and weather forecasts into one clear workspace.')}</p><div class="auth-story-markers"><span>NASA POWER</span><span>Open-Meteo</span><span>MapLibre</span></div></div>
+  <div class="auth-story-orbit" aria-hidden="true"></div><small class="auth-story-foot">AGROMATCH · EARTH INTELLIGENCE</small>
+ </aside><main class="auth-form-pane"><div class="auth-form-inner">
+  <span class="section-eyebrow">${r?t('НОВЫЙ АККАУНТ','NEW ACCOUNT'):t('С ВОЗВРАЩЕНИЕМ','WELCOME BACK')}</span>
+  <h1>${r?t('Создайте аккаунт','Create your account'):t('Войдите в AgroMatch','Sign in to AgroMatch')}</h1>
+  <p class="mut">${r?t('Для начала достаточно имени и электронной почты.','Start with your name and email address.'):t('Продолжайте работу с вашими полями.','Continue managing your fields.')}</p>
+  <form onsubmit="event.preventDefault();doAuth()">
+   ${r?`<label for="nm">${t('Имя','Your name')}</label><input id="nm" name="name" autocomplete="name" required placeholder="${t('Как вас зовут?','Your name')}">`:''}
+   <label for="em">Email</label><input id="em" name="email" type="email" autocomplete="email" required placeholder="you@example.com">
+   <label for="pw">${t('Пароль','Password')}</label><input id="pw" name="password" type="password" autocomplete="${r?'new-password':'current-password'}" minlength="6" required placeholder="${t('Минимум 6 символов','At least 6 characters')}">
+   <button type="submit" class="btn auth-submit">${r?t('Зарегистрироваться','Create account'):t('Войти','Sign in')} →</button>
+  </form>
+  <div class="auth-switch">${r?t('Уже есть аккаунт?','Already have an account?'):t('Впервые здесь?','New to AgroMatch?')} <button onclick="S.auth='${r?'login':'register'}';draw()">${r?t('Войти','Sign in'):t('Создать аккаунт','Create account')}</button></div>
+  <div class="auth-trust-note">ⓘ ${t('Пока используется бесплатный сервер с временным хранилищем: не сохраняйте здесь незаменимые данные.','This demo currently uses temporary hosting storage. Do not save irreplaceable farm records.')}</div>
+ </div></main></div>`;
+}
 const doAuth=()=>tryit(async()=>{const r=await api('/'+(S.auth=='register'?'register':'login'),{b:{email:$('#em').value,password:$('#pw').value,name:$('#nm')?.value||''}});T=r.token;localStorage.tok=T;await boot()});
 /* ---------- farm & field setup ---------- */
 function farmSetup(){const f=S.me.farm||{};return`<h1 style="margin-top:14px">${f.id?'Edit farm':'Register your farm'}</h1><label>Farm name</label><input id="fn" value="${esc(f.name||'')}"><label>Find location</label><div class="row"><input id="fq" placeholder="Village, region or country" style="margin:4px 0 10px" value="${esc(f.region||'')}"><button class="btn s" onclick="findLoc()">Search</button></div><div id="fmap" class="map"></div><div class="mut" id="floc">${S.loc||f.id?`Location set: ${(S.loc||f).lat.toFixed(4)}, ${(S.loc||f).lon.toFixed(4)}`:'Search or tap the map to set farm location.'}</div><label style="display:block;margin-top:10px">Farming practice</label><select id="fp">${['conventional','no-till','organic','regenerative'].map(p=>`<option ${f.practice==p?'selected':''}>${p}</option>`).join('')}</select><label>Priorities</label><div>${['Save water','Soil health','Profit','Low inputs','Resilience','Knowledge sharing','Equipment sharing','Joint purchases'].map(p=>`<button class="chip ${S.pri.includes(p)?'on':''}" onclick="S.pri.includes('${p}')?S.pri.splice(S.pri.indexOf('${p}'),1):S.pri.push('${p}');this.classList.toggle('on')">${p}</button>`).join('')}</div><button class="btn" style="margin-top:12px" onclick="saveFarm()">${f.id?'Save':'Continue: add fields'}</button>${f.id?'<button class="btn o" style="margin-top:8px" onclick="S.scr=\'app\';draw()">Cancel</button>':''}`}
