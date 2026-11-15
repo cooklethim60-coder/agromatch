@@ -421,6 +421,53 @@ def comment_post(pid:int,b:CommentIn,u=Depends(me)):
     if p['author_farm']!=fid:create_notification(p['author_farm'],'comment','New comment on your post',f'post:{pid}')
     return feed_post(p,fid)
 
+
+# ---------- clicked point inside an owned field ----------
+def point_in_field(lon: float, lat: float, polygon):
+    """Ray casting in lon/lat for small field polygons; boundaries count as inside."""
+    inside = False
+    for a, b in zip(polygon, polygon[1:] + polygon[:1]):
+        x1,y1 = a; x2,y2 = b
+        cross = (lon-x1)*(y2-y1) - (lat-y1)*(x2-x1)
+        if abs(cross) <= 1e-10 and min(x1,x2)-1e-9 <= lon <= max(x1,x2)+1e-9 and min(y1,y2)-1e-9 <= lat <= max(y1,y2)+1e-9:
+            return True
+        if (y1>lat)!=(y2>lat) and lon < (x2-x1)*(lat-y1)/(y2-y1)+x1:
+            inside = not inside
+    return inside
+
+class MapPointIn(BaseModel):
+    lat: float = Field(ge=-90,le=90)
+    lon: float = Field(ge=-180,le=180)
+
+@app.post('/api/fields/{fid}/point-conditions')
+async def point_conditions(fid: int, b: MapPointIn, u=Depends(me)):
+    """Live numerical context at selected map coordinates, not pixel-accurate readings."""
+    f=own_field(u, fid)
+    ring=json.loads(f['polygon'])
+    if not point_in_field(b.lon,b.lat,ring):
+        raise HTTPException(422,'Choose a location inside the selected field boundary')
+    forecast_result,power_result=await asyncio.gather(
+        agro_services.forecast(b.lat,b.lon),
+        nasa_intelligence.field_intelligence(b.lat,b.lon,30,False),
+        return_exceptions=True)
+    result={
+        'field_id':fid, 'field_name':f['name'],
+        'coordinates':{'lat':b.lat,'lon':b.lon},
+        'forecast':None,'power':None,'unavailable':{},
+        'scope':{'forecast':'Open-Meteo numerical model at selected coordinates, NOT an in-field measurement',
+                 'power':'NASA POWER gridded regional estimates; multiple clicks in one field may use the same grid cell',
+                 'satellite':'GIBS map overlays are visual images, NOT numerical measurements at the clicked pixel'}
+    }
+    if isinstance(forecast_result,Exception):
+        result['unavailable']['forecast']='Weather provider unavailable ('+type(forecast_result).__name__+')'
+    else: result['forecast']=forecast_result
+    if isinstance(power_result,Exception):
+        result['unavailable']['power']='NASA POWER unavailable ('+type(power_result).__name__+')'
+    else:
+        result['power']=power_result.get('data',{}).get('POWER')
+        if not result['power']: result['unavailable']['power']=power_result.get('unavailable',{}).get('POWER','NASA POWER unavailable')
+    return result
+
 # ---------- weather and field doctor ----------
 @app.get('/api/fields/{fid}/weather')
 async def field_weather(fid:int,u=Depends(me)):
