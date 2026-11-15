@@ -109,7 +109,7 @@ function onb(){
  return `<div class="welcome-shell">
   <div class="welcome-top"><div class="welcome-logo"><span class="welcome-mark">A</span><span><b>AGROMATCH</b><small>EARTH INTELLIGENCE</small></span></div><div class="welcome-top-actions"><button class="mini-link" onclick="toggleUiLanguage()">🌐 ${ru?'English':'Русский'}</button><button class="mini-link" onclick="S.scr='auth';draw()">${t('Пропустить','Skip')} ↗</button></div></div>
   <div class="welcome-stage">
-   <div class="welcome-art" aria-hidden="true"><div class="welcome-globe"><span class="welcome-globe-glow">✦</span><i></i><i></i><i></i></div><div class="welcome-float-label">43.24° N, 76.92° E <span>·</span> EARTH DATA</div></div>
+   <div class="welcome-art welcome-art-live"><div id="welcomeEarth" class="welcome-earth-map" role="region" aria-label="${t("Интерактивная 3D-карта Земли","Interactive 3D Earth map")}"></div><div class="welcome-earth-top"><span class="planet-live"><i></i> AGROMATCH / EARTH</span><span class="welcome-earth-note">${t("Поворачивайте и приближайте планету","Drag and zoom the globe")}</span></div><div class="welcome-earth-controls"><button onclick="welcomeFly(68,48,4.3)" title="Kazakhstan">◈ ${t("Казахстан","Kazakhstan")}</button><button onclick="welcomeFly(76.945,43.239,10)" title="Almaty">⌖ ${t("Алматы","Almaty")}</button><button onclick="welcomeFly(68,32,1.6)" title="Whole Earth">◎ ${t("Вся Земля","Whole Earth")}</button></div><div class="welcome-float-label">NASA POWER <span>·</span> OPEN-METEO <span>·</span> ESRI IMAGERY</div></div>
    <div class="welcome-copy"><span class="welcome-kicker">0${S.ob+1} / 03 · ${t('СЕРВИС ДЛЯ ФЕРМЕРОВ','BUILT FOR GROWERS')}</span><h1>${slide[0]}</h1><p>${slide[1]}</p><div class="welcome-progress">${slides.map((_,i)=>`<i class="${i===S.ob?'active':''}"></i>`).join('')}</div><button class="btn" onclick="S.ob<2?S.ob++:S.scr='auth';draw()">${S.ob===2?t('Начать работу','Get started'):t('Продолжить','Continue')} <span aria-hidden="true">→</span></button><p class="welcome-source">${t('NASA POWER · Open-Meteo · спутниковые изображения','NASA POWER · Open-Meteo · satellite imagery')}</p></div>
   </div>
  </div>`;
@@ -323,7 +323,9 @@ function downloadPointReport(){
  link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();
  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+function welcomeFly(lon,lat,zoom){const m=maps.welcomeEarth;if(m?.flyTo)m.flyTo({center:[lon,lat],zoom,pitch:0,speed:1.1,essential:true})}
 function after(){
+ if(S.scr==='onb')mkMap('welcomeEarth',{center:[68,32],zoom:1.65,pitch:0});
  if(S.scr==='app'&&S.tab==='home'&&S.me?.fields?.length){
   const fields=S.me.fields,farm=S.me.farm;
   mkMap('homeFarmMap',{center:[farm?.lon||fields[0].lon,farm?.lat||fields[0].lat],zoom:11,pitch:0,onload:m=>{

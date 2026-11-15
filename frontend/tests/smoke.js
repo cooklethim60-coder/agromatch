@@ -46,6 +46,8 @@ vm.runInContext("S.me.fields.push("+JSON.stringify(secondField)+");S.scr='app';S
 assert(el('#main').innerHTML.includes('field-compare-table'),'Missing field comparison table');
 vm.runInContext("S.scr='onb';draw()",context);
 assert(el('#main').innerHTML.includes('welcome-shell'),'Missing redesigned onboarding');
+assert(el('#main').innerHTML.includes('id="welcomeEarth"'),'Onboarding interactive Earth missing');
+assert(el('#main').innerHTML.includes('welcomeFly(76.945,43.239,10)'),'Onboarding Almaty shortcut missing');
 vm.runInContext("S.scr='auth';draw()",context);
 assert(el('#main').innerHTML.includes('auth-form-pane'),'Missing responsive auth form');
 assert(el('#main').innerHTML.includes('toggleUiLanguage'),'Language switch inaccessible before login');
