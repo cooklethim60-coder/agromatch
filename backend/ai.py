@@ -1,4 +1,13 @@
-"""Interchangeable AI providers with automatic fallback. Keys are read from backend env only."""
+"""Interchangeable AI providers. Fast-fail demo mode, bounded exact-request cache.
+
+Keys are read from backend env only. Cache is per process, not durable; never
+serve a response for a different prompt, farm, field or conversation.
+"""
+import asyncio
+import hashlib
+import json
+import time
+from collections import OrderedDict
 
 import os, httpx
 from dotenv import load_dotenv
@@ -15,7 +24,7 @@ def providers():
     return out
 
 async def _anthropic(p, system, msgs):
-    async with httpx.AsyncClient(timeout=90) as c:
+    async with httpx.AsyncClient(timeout=_request_timeout()) as c:
         r = await c.post((p["base"] or "https://api.anthropic.com") + "/v1/messages", headers={"x-api-key": p["key"], "anthropic-version": "2023-06-01"},
                          json={"model": p["model"], "max_tokens": 1400, "system": system, "messages": msgs})
         r.raise_for_status()
@@ -46,14 +55,62 @@ async def _gemini(p, system, msgs):
     if not text: raise ValueError('Gemini returned an empty response')
     return text
 
+# Exact-input cache: repeated presentation questions return without another API call.
+# A per-process cache is intentionally small and cleared on service restart.
+_CACHE = OrderedDict()
+_CACHE_LIMIT = 128
+_CACHE_TTL = 3600
+
+
+def _request_timeout():
+    try:
+        return max(3.0, min(45.0, float(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "9"))))
+    except ValueError:
+        return 9.0
+
+
+def _cache_key(system, msgs, configured):
+    # Include model/provider configuration so a model change invalidates prior answers.
+    # Hash secrets instead of storing them in plain text as cache keys.
+    configuration = [(p["kind"], p.get("model", ""), p.get("base", ""), hashlib.sha256(p.get("key", "").encode()).hexdigest()) for p in configured]
+    body = json.dumps([system, msgs, configuration], sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
 async def complete(system, msgs):
-    errs = []
-    for p in providers():
+    configured = providers()
+    if not configured:
+        raise RuntimeError("No AI provider configured. Set AI_PRIMARY_PROVIDER and AI_PRIMARY_API_KEY.")
+    key = _cache_key(system, msgs, configured)
+    cached = _CACHE.get(key)
+    if cached:
+        answer, provider, created = cached
+        if time.monotonic() - created < _CACHE_TTL:
+            _CACHE.move_to_end(key)
+            return answer, provider + ":cached"
+        del _CACHE[key]
+    errors = []
+    handlers = {"anthropic": _anthropic, "openai": _openai, "grok": _openai, "gemini": _gemini}
+    # No slow retry loop: presentation mode prioritizes a bounded response time.
+    for p in configured:
         try:
-            handlers = {"anthropic": _anthropic, "openai": _openai, "grok": _openai, "gemini": _gemini}
-            if p["kind"] not in handlers: raise ValueError('Unknown AI provider type')
-            text = await handlers[p["kind"]](p, system, msgs)
-            return text, f'{p["tag"]}:{p["kind"]}:{p["model"]}'
-        except Exception as e:  # rate limit, outage, bad key -> try next provider
-            errs.append(f'{p["tag"]}: {type(e).__name__} {e}')
-    raise RuntimeError("; ".join(errs) or "No AI provider configured. Copy .env.example to .env and set AI_PRIMARY_* keys.")
+            if p["kind"] not in handlers:
+                raise ValueError("Unknown AI provider type")
+            answer = await asyncio.wait_for(
+                handlers[p["kind"]](p, system, msgs), timeout=_request_timeout() + 1
+            )
+            provider = f'{p["tag"]}:{p["kind"]}:{p["model"]}'
+            _CACHE[key] = (answer, provider, time.monotonic())
+            _CACHE.move_to_end(key)
+            while len(_CACHE) > _CACHE_LIMIT:
+                _CACHE.popitem(last=False)
+            return answer, provider
+        except (httpx.HTTPError, asyncio.TimeoutError, ValueError) as exc:
+            if isinstance(exc, httpx.HTTPStatusError):
+                code = exc.response.status_code
+                errors.append(f'{p["tag"]}: Google/provider HTTP {code}')
+            elif isinstance(exc, (httpx.TimeoutException, asyncio.TimeoutError)):
+                errors.append(f'{p["tag"]}: timed out')
+            else:
+                errors.append(f'{p["tag"]}: {type(exc).__name__}')
+    raise RuntimeError("; ".join(errors) + ". Try a configured backup provider or use a previously prepared answer.")
