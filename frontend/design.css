@@ -116,3 +116,16 @@ h1{font-size:27px;line-height:1.15;font-weight:730;letter-spacing:-.6px}h2{lette
 .earth-point-actions button{margin:0}
 @media(min-width:700px){.earth-point-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:480px){.earth-map-hint{font-size:11px}.earth-search .btn{padding:9px}}
+
+
+/* Data trust, global language and field report usability */
+.data-retention-note{padding:13px 16px;margin:0 0 18px;border:1px solid #bb8547;background:#fff6e5;color:#684621;border-radius:14px;font-size:13px;line-height:1.5}
+.data-retention-note b{display:block;margin-bottom:4px}
+.language-switch{display:block;margin:10px 0 0;padding:8px 10px;border-radius:9px;border:1px solid #ffffff55;background:#ffffff14;color:#fff;cursor:pointer;font-size:12px}
+.language-switch:hover{background:#ffffff30}
+.language-mobile{margin:12px 0;width:100%}
+.weather-source-hint{font-size:12px;border-left:3px solid #759c87;padding:8px 11px;background:var(--sage2);line-height:1.5}
+.earth-provenance{background:var(--sage2);border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin:12px 0;font-size:12px;line-height:1.5}
+.earth-provenance p{margin:7px 0}
+.earth-point-metric strong{font-variant-numeric:tabular-nums}
+@media(max-width:560px){.data-retention-note{font-size:12px}}
