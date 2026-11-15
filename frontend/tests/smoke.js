@@ -17,4 +17,27 @@ for(const name of ['home','earth','fields','doctor','weather','rot','co','match'
  try{vm.runInContext(`S.tab='${name}';draw()`,context);const html=el('#main').innerHTML;if(!html||!html.includes('<'))throw Error('Empty view');checked++}
  catch(e){console.error(name,e);process.exitCode=1}
 }
+// Product UX regression checks: map-first overview, Earth inspector, search and locale.
+const assert=require('assert');
+vm.runInContext("S.tab='home';draw()",context);
+const home=el('#main').innerHTML;
+for(const id of ['homeFarmMap','homeForecast','homeFeed']){
+ assert(home.includes('id="'+id+'"'), 'Overview missing '+id);
+}
+assert(home.includes('command-stats'),'Missing farm statistics');
+assert(home.includes('downloadFieldsGeoJSON'),'Missing boundary export');
+vm.runInContext("S.tab='earth';draw()",context);
+const earth=el('#main').innerHTML;
+assert(earth.includes('earth-workspace-grid'),'Missing Earth split-view');
+assert(earth.includes('id="esel"'),'Missing point inspector');
+assert(earth.includes('focusEarthField(1)'),'Missing field jump');
+vm.runInContext("S.tab='fields';S.fieldQuery='zz_missing';draw()",context);
+assert(el('#main').innerHTML.includes('fields-empty'),'Field search lacks empty state');
+vm.runInContext("S.fieldQuery='North';draw()",context);
+assert(el('#main').innerHTML.includes('field-management-card'),'Field filtering did not find North');
+context.localStorage.agromatchLanguage='en';
+vm.runInContext("S.tab='home';draw()",context);
+assert(el('#main').innerHTML.includes('All your fields.'),'Missing English overview');
+context.localStorage.agromatchLanguage='ru';
+console.log('Studio UX smoke: dashboard, Earth inspector, field filtering, locale OK');
 console.log(`Frontend static navigation smoke: ${checked}/13 sections rendered`);
