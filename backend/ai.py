@@ -72,7 +72,7 @@ def _request_timeout():
 def _cache_key(system, msgs, configured):
     # Include model/provider configuration so a model change invalidates prior answers.
     # Hash secrets instead of storing them in plain text as cache keys.
-    configuration = [(p["kind"], p["model"], p["base"], hashlib.sha256(p["key"].encode()).hexdigest()) for p in configured]
+    configuration = [(p["kind"], p.get("model", ""), p.get("base", ""), hashlib.sha256(p["key"].encode()).hexdigest()) for p in configured]
     body = json.dumps([system, msgs, configuration], sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
