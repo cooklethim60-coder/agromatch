@@ -38,7 +38,7 @@ function weatherPage(){
  return hdr('Weather & Climate','Погода на поле · прогноз с числами и таблицей')+
  `<div class="feature-panel weather-dashboard">
  <div class="weather-toolbar">${selFieldHtml('loadWeather')}
- <button class="btn o s" onclick="loadWeather()" title="Update data">↻ Обновить прогноз</button></div>
+ <button class="btn o s" onclick="loadWeather(true)" title="Запросить свежий прогноз">↻ Обновить прогноз</button></div>
  <div id="weatherResults" class="loading-region" aria-live="polite">Загружаем прогноз погоды…</div></div>`;
 }
 function weatherNum(x,digits=0,suffix=''){
@@ -55,7 +55,7 @@ function renderWeatherDashboard(){
  const days=w.days.slice(0,S.weatherRange===3?3:7);
  const f=S.me.fields.find(z=>z.id===S.extraField);
  const m=f?.snapshots?.[0]?.metrics;
- const sum=k=>days.reduce((a,d)=>a+(Number.isFinite(Number(d[k]))&&d[k]!=null?Number(d[k]):0),0);
+ const sum=k=>days.every(d=>d[k]!=null&&Number.isFinite(Number(d[k])))?days.reduce((a,d)=>a+Number(d[k]),0):null;
  const validHigh=days.filter(d=>d.high!=null).map(d=>Number(d.high));
  const high=validHigh.length?Math.max(...validHigh):null;
  const lows=days.filter(d=>d.low!=null).map(d=>Number(d.low));
@@ -64,7 +64,7 @@ function renderWeatherDashboard(){
  const chanceMax=chance.length?Math.max(...chance):null;
  const card=(symbol,title,value,note)=>`<div class="weather-kpi"><span class="weather-kpi-label">${symbol} ${title}</span><strong>${value}</strong><small>${note}</small></div>`;
  el.innerHTML=`<div class="row sb weather-head"><div><div class="section-eyebrow">OPEN-METEO · ПРОГНОЗ</div><h2>${esc(f?.name||'Поле')}</h2><p class="mut">По координатам поля · ${esc(w.timezone||'часовой пояс модели')}</p></div><span class="tag f_">FORECAST</span></div>
- <div class="weather-filters" role="group" aria-label="Период прогноза"><span>Показать:</span><button class="chip ${S.weatherRange===3?'on':''}" onclick="S.weatherRange=3;renderWeatherDashboard()">3 дня</button><button class="chip ${S.weatherRange!==3?'on':''}" onclick="S.weatherRange=7;renderWeatherDashboard()">7 дней</button></div>
+ <p class="weather-source-hint">📍 Точки представляют расчётные ячейки погодной модели, а не локальные датчики на ферме. Полный прогноз: ${w.complete_days??"—"} из ${w.days.length} дней.</p><div class="weather-filters" role="group" aria-label="Период прогноза"><span>Показать:</span><button class="chip ${S.weatherRange===3?'on':''}" onclick="S.weatherRange=3;renderWeatherDashboard()">3 дня</button><button class="chip ${S.weatherRange!==3?'on':''}" onclick="S.weatherRange=7;renderWeatherDashboard()">7 дней</button></div>
  <div class="weather-kpis">
  ${card('🌡️','Макс. температура',weatherNum(high,1,' °C'),'За выбранный период')}
  ${card('❄️','Мин. температура',weatherNum(low,1,' °C'),'За выбранный период')}
@@ -86,13 +86,13 @@ function renderWeatherDashboard(){
  <p class="mut">Источник: ${esc(m.source||'не указан')} ${m.simulated?tag('s'):tag('n')}</p>`:'<p class="mut">Нет исторических измерений для этого поля.</p>'}
  <div class="footnote">Прогноз: ${esc(w.source)} · получен ${new Date(w.fetched_at*1000).toLocaleString('ru-RU')} · ${esc(w.limitations)}. Погодные прогнозы не являются измерениями датчиков на поле.</div>`;
 }
-async function loadWeather(){
+async function loadWeather(refresh=false){
  const el=$('#weatherResults');if(!el)return;
  const fid=S.extraField;
  S.weatherData=null;
  el.innerHTML='<p class="mut">Получаем свежий прогноз погоды…</p>';
  try{
-  const w=await api(`/fields/${fid}/weather`);
+  const w=await api(`/fields/${fid}/weather${refresh?'?refresh=true':''}`);
   if(S.extraField!==fid||!$('#weatherResults'))return;
   S.weatherData=w;
   S.weatherRange=S.weatherRange===3?3:7;
