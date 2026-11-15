@@ -14,14 +14,24 @@ const NAV=[
  {id:'knowledge',title:'Knowledge Hub',ico:'knowledge',group:'EXPLORE'},
  {id:'reports',title:'Reports',ico:'reports',group:'EXPLORE'}];
 const moreTabs=['doctor','weather','rot','co','chat','music','knowledge','reports'];
+// Shared RU/EN navigation for Kazakhstan and international users.
+// Detailed feature content retains source-specific English text until fully translated.
+const NAV_RU={home:'Обзор',earth:'Карта и спутники',fields:'Мои поля',doctor:'Проверка поля',
+ weather:'Погода и климат',rot:'Севооборот',co:'AI-агроном',match:'Фермеры',
+ chat:'Сообщения',feed:'Сообщество',music:'Музыка полей',knowledge:'База знаний',
+ reports:'Отчёты',more:'Ещё'};
+function uiLanguage(){return localStorage.agromatchLanguage==='en'?'en':'ru'}
+function navLabel(x){return uiLanguage()==='ru'?(NAV_RU[x.id]||x.title):x.title}
+function toggleUiLanguage(){localStorage.agromatchLanguage=uiLanguage()==='ru'?'en':'ru';draw()}
+
 const featureIcons={fields:'<path d="M3 3h18v18H3zM3 11h18M11 3v18"/>',doctor:'<path d="M12 3v18M3 12h18M5 5l14 14"/>',weather:'<path d="M4 17a5 5 0 0 1 4-8 7 7 0 0 1 13 4 4 4 0 0 1-4 7H8z"/>',chat:'<path d="M4 4h16v12H9l-5 4z"/>',feed:'<path d="M5 5h14M5 11h14M5 17h10"/>',music:'<path d="M9 18V5l12-2v13M9 8l12-2"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',knowledge:'<path d="M3 5c3-2 6-2 9 0 3-2 6-2 9 0v15c-3-2-6-2-9 0-3-2-6-2-9 0zM12 5v15"/>',reports:'<path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7"/>',more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'};
 function shellNav(){
  const groups=['PLATFORM','INTELLIGENCE','COMMUNITY','EXPLORE'];
  const desktop=`<div class="nav-brand"><div class="brand-mark">A</div><div><b>AGROMATCH</b><small>EARTH INTELLIGENCE</small></div></div>`+
-  groups.map(g=>`<div class="nav-group"><div class="nav-label">${g}</div>${NAV.filter(x=>x.group===g).map(x=>`<button class="nav-entry ${S.tab===x.id?'on':''}" onclick="tab('${x.id}')">${ic(x.ico)}<span>${x.title}</span>${x.id==='chat'&&S.notif?`<i class="nav-count">${S.notif}</i>`:''}</button>`).join('')}</div>`).join('')+
-  `<div class="nav-footer"><span class="status-led"></span> NASA • Earth data intelligence</div>`;
+  groups.map(g=>`<div class="nav-group"><div class="nav-label">${g}</div>${NAV.filter(x=>x.group===g).map(x=>`<button class="nav-entry ${S.tab===x.id?'on':''}" onclick="tab('${x.id}')">${ic(x.ico)}<span>${navLabel(x)}</span>${x.id==='chat'&&S.notif?`<i class="nav-count">${S.notif}</i>`:''}</button>`).join('')}</div>`).join('')+
+  `<div class="nav-footer"><span class="status-led"></span> NASA • Earth data intelligence <button class="language-switch" onclick="toggleUiLanguage()" title="Русский / English">${uiLanguage()==='ru'?'English':'Русский'}</button></div>`;
  const mobile=[...NAV.filter(x=>['home','earth','fields','feed','match'].includes(x.id)),{id:'more',title:'More',ico:'more'}];
- return `<nav class="desktop-nav">${desktop}</nav><nav class="mobile-nav">${mobile.map(x=>`<button class="${S.tab===x.id||(x.id==='more'&&moreTabs.includes(S.tab))?'on':''}" onclick="${x.id==='more'?'openMore()':`tab('${x.id}')`}">${ic(x.ico)}<span>${x.title==='Satellite Earth'?'Earth':x.title==='Overview'?'Home':x.title==='My Fields'?'Fields':x.title==='Farm Feed'?'Feed':x.title==='Farm Match'?'Match':x.title}</span></button>`).join('')}</nav>`;
+ return `<nav class="desktop-nav">${desktop}</nav><nav class="mobile-nav">${mobile.map(x=>`<button class="${S.tab===x.id||(x.id==='more'&&moreTabs.includes(S.tab))?'on':''}" onclick="${x.id==='more'?'openMore()':`tab('${x.id}')`}">${ic(x.ico)}<span>${uiLanguage()==='ru'?navLabel(x):(x.title==='Satellite Earth'?'Earth':x.title==='Overview'?'Home':x.title==='My Fields'?'Fields':x.title==='Farm Feed'?'Feed':x.title==='Farm Match'?'Match':x.title)}</span></button>`).join('')}</nav>`;
 }
 function openMore(){ovOpen(`<h1>Explore AgroMatch</h1><p class="mut">Choose a workspace</p><div class="extra-menu">${NAV.map(x=>`<button onclick="closeOv();tab('${x.id}')">${ic(x.ico)}<span>${x.title}</span></button>`).join('')}</div>`)}
 function selFieldHtml(action){return `<label>Selected field</label><select onchange="S.extraField=+this.value;${action}()">${S.me.fields.map(f=>`<option value="${f.id}" ${f.id===S.extraField?'selected':''}>${esc(f.name)} · ${f.area_ha} ha</option>`).join('')}</select>`}
