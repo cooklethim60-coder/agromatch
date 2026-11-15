@@ -90,41 +90,44 @@ function pointMetric(name,value,unit='',note=''){
 async function loadMapPoint(fid,lat,lon){
  const el=$('#esel');if(!el)return;
  const f=S.me.fields.find(x=>x.id===fid);if(!f)return;
- const marker=maps.earth;
  if(S.earthMarker){S.earthMarker.remove();S.earthMarker=null}
- if(marker&&window.maplibregl)S.earthMarker=new maplibregl.Marker({color:'#F0A438'}).setLngLat([lon,lat]).addTo(marker);
+ if(maps.earth&&window.maplibregl)S.earthMarker=new maplibregl.Marker({color:'#F0A438'}).setLngLat([lon,lat]).addTo(maps.earth);
  const seq=S.earthPointSeq=(S.earthPointSeq||0)+1;
- el.innerHTML=`<div class="feature-panel"><div class="row sb"><div><div class="section-eyebrow">ВЫБРАННАЯ ТОЧКА</div><h2>${esc(f.name)}</h2><p class="mut">${lat.toFixed(5)}° N, ${lon.toFixed(5)}° E · ${Number(f.area_ha).toLocaleString('ru-RU')} га</p></div><span class="tag f_">FETCHING</span></div><p class="mut">Загрузка климатических и погодных показателей по координатам…</p></div>`;
+ el.innerHTML=`<div class="feature-panel"><h2>${esc(f.name)}</h2><p class="mut">Получаем реальные данные для выбранной точки (${lat.toFixed(5)}, ${lon.toFixed(5)})…</p></div>`;
  try{
   const r=await api(`/fields/${fid}/point-conditions`,{b:{lat,lon}});
   if(seq!==S.earthPointSeq||!$('#esel'))return;
-  const w=r.forecast,d=w?.days?.[0]||{},power=r.power,ind=power?.indicators||{};
+  const w=r.forecast, d=w?.days?.[0]||{}, power=r.power, ind=power?.indicators||{};
+  let weatherHtml='<p class="warn">Прогноз недоступен: '+esc(r.unavailable?.forecast||'нет данных')+'</p>';
+  if(w){
+   weatherHtml='<div class="earth-point-metrics">'+
+    pointMetric('🌡️ Макс. температура',d.high==null?null:Number(d.high).toFixed(1),' °C','Прогноз на сегодня')+
+    pointMetric('❄️ Мин. температура',d.low==null?null:Number(d.low).toFixed(1),' °C','Прогноз на сегодня')+
+    pointMetric('🌧️ Осадки',d.rain==null?null:Number(d.rain).toFixed(1),' мм','Прогноз за сутки')+
+    pointMetric('☔ Вероятность дождя',d.rain_chance==null?null:Math.round(d.rain_chance),' %','Максимум за сутки')+
+    pointMetric('💨 Ветер',w.wind_today,' км/ч','Максимум за сегодня')+
+    pointMetric('💧 Влажность воздуха',w.humidity_today,' %','Средняя первых 24 часов')+
+    '</div><p class="mut">Источник: '+esc(w.source)+' · '+esc(d.date||'')+' · модель, не датчик на поле.</p>';
+  }
+  let nasaHtml='<p class="warn">NASA POWER недоступен: '+esc(r.unavailable?.power||'нет данных')+'</p>';
+  if(power){
+   const period=power.period||{};
+   nasaHtml='<div class="earth-point-metrics">'+
+    pointMetric('🌧️ Осадки',ind.rain_total_mm,' мм','Сумма за доступные дни')+
+    pointMetric('🌡️ Средняя температура',ind.mean_temp_c,' °C','Региональная оценка')+
+    pointMetric('☀️ Солнечная энергия',ind.mean_solar_kwh_m2_day,' кВт·ч/м²/сут','Среднее за период')+
+    pointMetric('❄️ Морозные дни',ind.frost_days_min_le_0c,' дн.','Tmin ≤ 0 °C')+
+    pointMetric('🔥 Жаркие дни',ind.heat_days_max_ge_35c,' дн.','Tmax ≥ 35 °C')+
+    pointMetric('📅 Дней с данными',period.valid_days,'','С '+esc(period.first_observation||'—')+' по '+esc(period.last_observation||'—'))+
+    '</div><p class="mut">Источник: '+esc(power.source)+'. Региональная климатическая сетка (не измерение точно в поле).</p>';
+  }
   el.innerHTML=`<div class="feature-panel earth-point-card">
-   <div class="row sb"><div><div class="section-eyebrow">ТОЧКА НА ПОЛЕ</div><h2>${esc(f.name)}</h2><p class="mut">Широта: ${lat.toFixed(5)} · Долгота: ${lon.toFixed(5)} · ${Number(f.area_ha).toLocaleString('ru-RU')} га</p></div><span class="tag f_">LIVE API</span></div>
-   <h3>🌦️ Прогноз на сегодня · Open-Meteo</h3>
-   ${w?`<div class="earth-point-metrics">
-   ${pointMetric('🌡️ Температура',d.high==null?null:Number(d.high).toFixed(1),' °C','Дневной максимум')}
-   ${pointMetric('❄️ Минимум',d.low==null?null:Number(d.low).toFixed(1),' °C','Прогноз на день')}
-   ${pointMetric('🌧️ Осадки',d.rain==null?null:Number(d.rain).toFixed(1),' мм','Суточная сумма')}
-   ${pointMetric('☔ Вероятность',d.rain_chance==null?null:Math.round(d.rain_chance),' %','Максимум за день')}
-   ${pointMetric('💨 Ветер',w.wind_today==null?null:w.wind_today,' км/ч','Максимум за день')}
-   ${pointMetric('💧 Влажность воздуха',w.humidity_today==null?null:w.humidity_today,' %','Средняя за первые 24 часа')}
-   </div><p class="mut">Источник: ${esc(w.source)} · ${esc(d.date||'')} · прогноз модели, не замер на поле.</p>`:`<p class="warn">Прогноз недоступен: ${esc(r.unavailable?.forecast||'нет данных')}</p>`}
-   <h3>🛰️ NASA POWER · последние 30 дней доступных наблюдений</h3>
-   ${power?`<div class="earth-point-metrics">
-    ${pointMetric('🌧️ Осадки',ind.rain_total_mm,' мм','Сумма за доступные дни')}
-    ${pointMetric('🌡️ Средняя температура',ind.mean_temp_c,' °C','Региональная сетка')}
-    ${pointMetric('☀️ Солнечная энергия',ind.mean_solar_kwh_m2_day,' кВт·ч/м²/сутки','Среднее за доступные дни')}
-    ${pointMetric('❄️ Морозные дни',ind.frost_days_min_le_0c,' дн.','Tmin ≤ 0°C')}
-    ${pointMetric('🔥 Жаркие дни',ind.heat_days_max_ge_35c,' дн.','Tmax ≥ 35°C')}
-    ${pointMetric('📅 Дней с данными',power.period?.valid_days,'','Даты: ${esc(power.period?.first_observation||'—')} — ${esc(power.period?.last_observation||'—')}')}
-   </div><p class="mut">${esc(power.kind)} · ${esc(power.source)}. Сетка NASA POWER может охватывать десятки километров; клик по соседним точкам может дать одинаковые значения.</p>`:`<p class="warn">NASA POWER недоступен: ${esc(r.unavailable?.power||'нет данных')}</p>`}
-   <div class="earth-point-actions"><button class="btn s" onclick="S.extraField=${fid};tab('weather')">Открыть прогноз на 7 дней</button><button class="btn o s" onclick="ovField(${fid})">Данные поля</button><button class="btn o s" onclick="loadMapPoint(${fid},${lat},${lon})">↻ Обновить точку</button></div>
-   <div class="footnote">Точка выбрана внутри контура. Визуальные спутниковые слои GIBS не являются числовыми пиксельными замерами. Данные SMAP/MODIS/ECOSTRESS доступны только при наличии соответствующего проверенного продукта и обработки качества.</div>
-   </div>`;
- }catch(e){
-  if(seq===S.earthPointSeq&&$('#esel'))$('#esel').innerHTML=`<div class="warn">Ошибка загрузки условий: ${esc(e.message)}. Попробуй другую точку или повтори запрос.</div>`;
- }
+  <div class="row sb"><div><div class="section-eyebrow">ВЫБРАННАЯ ТОЧКА</div><h2>${esc(f.name)}</h2><p class="mut">Широта: ${lat.toFixed(5)} · Долгота: ${lon.toFixed(5)} · ${Number(f.area_ha).toLocaleString('ru-RU')} га</p></div><span class="tag f_">API</span></div>
+  <h3>🌦️ Прогноз сегодня · Open-Meteo</h3>${weatherHtml}
+  <h3>🛰️ NASA POWER · доступные данные за 30 дней</h3>${nasaHtml}
+  <div class="earth-point-actions"><button class="btn s" onclick="S.extraField=${fid};tab('weather')">Прогноз на 7 дней</button><button class="btn o s" onclick="ovField(${fid})">Информация о поле</button><button class="btn o s" onclick="loadMapPoint(${fid},${lat},${lon})">↻ Обновить</button></div>
+  <p class="footnote">Спутниковая картинка NASA GIBS не означает числовое измерение в точке. Прогноз и NASA POWER имеют пространственные ограничения.</p></div>`;
+ }catch(e){if(seq===S.earthPointSeq&&$('#esel'))$('#esel').innerHTML='<div class="warn">Ошибка данных: '+esc(e.message)+'</div>'}
 }
 function after(){if(S.scr=='fieldEd'){const m=mkMap('fed',{center:S.me.farm?[S.me.farm.lon,S.me.farm.lat]:[0,20],zoom:S.me.farm?15:2,onload:m=>{m.addSource('draw',{type:'geojson',data:geo(S.pts)});m.addLayer({id:'dfill',type:'fill',source:'draw',filter:['==','$type','Polygon'],paint:{'fill-color':'#7CFC9A','fill-opacity':.3}});m.addLayer({id:'dline',type:'line',source:'draw',filter:['==','$type','LineString'],paint:{'line-color':'#fff','line-width':2.5}});m.addLayer({id:'dpt',type:'circle',source:'draw',filter:['==','$type','Point'],paint:{'circle-radius':5,'circle-color':'#1F4D36','circle-stroke-color':'#fff','circle-stroke-width':2}});if(S.edit){const f=S.me.fields.find(x=>x.id==S.edit);if(!S.pts.length)S.pts=f.polygon.slice();upd();fit(m,S.pts)}}});m.on('click',e=>{S.pts.push([e.lngLat.lng,e.lngLat.lat]);upd()});m.getCanvas().style.cursor='crosshair'}
  if(S.scr=='farmSetup'){const f=S.me?.farm,m=mkMap('fmap',{center:f?[f.lon,f.lat]:[0,20],zoom:f?11:1.4});m.on('click',e=>setLoc(e.lngLat.lat,e.lngLat.lng,''));if(f){S.mk=new maplibregl.Marker({color:'#1F4D36'}).setLngLat([f.lon,f.lat]).addTo(m)}}
