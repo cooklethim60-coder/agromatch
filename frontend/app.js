@@ -141,7 +141,7 @@ function downloadFieldsGeoJSON(){
  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 function focusEarthField(id){
- const f=S.me?.fields?.find(x=>x.id===Number(id));S.earthFocus=f?.id||null;S.cam=null;S.tab='earth';draw();
+ const f=S.me?.fields?.find(x=>x.id===Number(id));S.earthFocus=f?.id||null;if(f)S.extraField=f.id;S.cam=null;S.tab='earth';draw();
 }
 function home(){
  const fs=S.me.fields||[],farm=S.me.farm||{},ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b;
@@ -225,6 +225,12 @@ function pointMetric(name,value,unit='',note=''){
 async function loadMapPoint(fid,lat,lon,refresh=false){
  const el=$('#esel');if(!el)return;
  const f=S.me.fields.find(x=>x.id===fid);if(!f)return;
+ if(S.extraField!==fid){
+  S.extraField=fid;
+  const sel=document.querySelector('.satellite-lab select');if(sel)sel.value=String(fid);
+  if(typeof loadEarthIntelligence==='function')loadEarthIntelligence();
+  if(typeof loadSatellite==='function')loadSatellite();
+ }
  if(S.earthMarker){S.earthMarker.remove();S.earthMarker=null}
  if(maps.earth&&window.maplibregl)S.earthMarker=new maplibregl.Marker({color:'#F0A438'}).setLngLat([lon,lat]).addTo(maps.earth);
  const seq=S.earthPointSeq=(S.earthPointSeq||0)+1;
