@@ -438,8 +438,8 @@ async def point_conditions(fid: int, b: MapPointIn, u=Depends(me)):
     if not point_in_field(b.lon,b.lat,ring):
         raise HTTPException(422,'Choose a location inside the selected field boundary')
     forecast_result,power_result=await asyncio.gather(
-        agro_services.forecast(b.lat,b.lon,refresh=b.refresh),
-        nasa_intelligence.field_intelligence(b.lat,b.lon,30,False,refresh=b.refresh),
+        asyncio.wait_for(agro_services.forecast(b.lat,b.lon,refresh=b.refresh),timeout=22),
+        asyncio.wait_for(nasa_intelligence.field_intelligence(b.lat,b.lon,30,False,refresh=b.refresh),timeout=22),
         return_exceptions=True)
     result={
         'field_id':fid, 'field_name':f['name'],
@@ -470,9 +470,9 @@ async def point_conditions(fid: int, b: MapPointIn, u=Depends(me)):
 
 # ---------- weather and field doctor ----------
 @app.get('/api/fields/{fid}/weather')
-async def field_weather(fid:int,u=Depends(me)):
+async def field_weather(fid:int,refresh:bool=False,u=Depends(me)):
     field=own_field(u,fid)
-    try: return await agro_services.forecast(field['lat'],field['lon'])
+    try: return await agro_services.forecast(field['lat'],field['lon'],refresh=refresh)
     except Exception as e:raise HTTPException(503,f'Weather forecast unavailable: {type(e).__name__}')
 
 @app.get('/api/fields/{fid}/doctor')
