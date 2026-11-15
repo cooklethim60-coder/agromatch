@@ -11,3 +11,5 @@ services:
         value: /app/storage/agromatch.db
       - key: MUSIC_PROVIDER
         value: procedural
+      - key: DATA_PERSISTENCE_MODE
+        value: ephemeral

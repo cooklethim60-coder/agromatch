@@ -1,0 +1,43 @@
+"""Small-field geometry helpers supporting polygons across the ±180° meridian.
+
+Approximate spherical area; use geodetic GIS tools for surveyed boundaries.
+Coordinates are (longitude, latitude). This module does not geocode addresses.
+"""
+import math
+
+EARTH_RADIUS_M = 6371008.8
+
+def _delta_lon(lon, reference):
+    return (lon - reference + 180.0) % 360.0 - 180.0
+
+def contains_point(lon, lat, ring):
+    """Treat boundary points as inside. Unwrap around query longitude."""
+    if len(ring) < 3 or not all(math.isfinite(x) for x in (lon, lat)):
+        return False
+    # Unwrap around the polygon, not the clicked point. Otherwise a
+    # dateline-crossing parcel would falsely include the whole world.
+    points = [(ring[0][0], ring[0][1])]
+    for x, y in ring[1:]:
+        previous_x = points[-1][0]
+        points.append((previous_x + _delta_lon(x, previous_x), y))
+    query_x = points[0][0] + _delta_lon(lon, points[0][0])
+    inside = False
+    for (x1, y1), (x2, y2) in zip(points, points[1:] + points[:1]):
+        cross = (query_x-x1) * (y2-y1) - (lat-y1) * (x2-x1)
+        if abs(cross) <= 1e-10 and min(x1,x2)-1e-9 <= query_x <= max(x1,x2)+1e-9 and min(y1,y2)-1e-9 <= lat <= max(y1,y2)+1e-9:
+            return True
+        if (y1 > lat) != (y2 > lat):
+            intersect = x1 + (x2-x1) * (lat-y1) / (y2-y1)
+            if intersect > query_x:
+                inside = not inside
+    return inside
+
+def area_ha(ring):
+    """Approximate spherical polygon area in hectares, with dateline unwrapping."""
+    if len(ring) < 3:
+        return 0.0
+    total = 0.0
+    for (lon1, lat1), (lon2, lat2) in zip(ring, ring[1:] + ring[:1]):
+        delta = math.radians(_delta_lon(lon2, lon1))
+        total += delta * (math.sin(math.radians(lat1)) + math.sin(math.radians(lat2)))
+    return round(abs(total) * EARTH_RADIUS_M**2 / 2.0 / 10000.0, 2)

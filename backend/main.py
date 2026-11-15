@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Header, WebSocket, WebSocketDisconne
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel, Field, field_validator
-import env, music, ai, rotation, agro_services, appeears, knowledge, nasa_intelligence, nasa_access
+import env, music, ai, rotation, agro_services, appeears, knowledge, nasa_intelligence, nasa_access, geo_utils
 import csv, io, html
 
 DB = ROOT / os.getenv("DATABASE_PATH", "agromatch.db"); AUDIO = ROOT / "storage" / "audio"; AUDIO.mkdir(parents=True, exist_ok=True)
@@ -92,9 +92,8 @@ def farm(b: FarmIn, u=Depends(me)):
     else: x("INSERT INTO farms(user_id,name,region,lat,lon,practice,priorities) VALUES(?,?,?,?,?,?,?)", (u["id"], b.name, b.region, b.lat, b.lon, b.practice, json.dumps(b.priorities)))
     return {"ok": True}
 def area_ha(ring):
-    la0 = sum(p[1] for p in ring) / len(ring); k = 111320 * math.cos(math.radians(la0))
-    pts = [(p[0] * k, p[1] * 110540) for p in ring]
-    return round(abs(sum(pts[i][0] * pts[(i + 1) % len(pts)][1] - pts[(i + 1) % len(pts)][0] * pts[i][1] for i in range(len(pts)))) / 2 / 10000, 2)
+    return geo_utils.area_ha(ring)
+
 class FieldIn(BaseModel):
     name: str = Field(min_length=1,max_length=150)
     polygon: list[list[float]] = Field(min_length=3,max_length=300)
@@ -144,7 +143,7 @@ async def edit_field(fid: int, b: FieldIn, u=Depends(me)): own_field(u, fid); re
 @app.get("/api/me")
 def get_me(u=Depends(me)):
     f = u["farm"]; fields = [fld(r) for r in q("SELECT * FROM fields WHERE farm_id=?", (f["id"],))] if f else []
-    return {"user": {"id": u["id"], "name": u["name"], "email": u["email"]}, "farm": f, "fields": fields}
+    return {"user": {"id": u["id"], "name": u["name"], "email": u["email"]}, "farm": f, "fields": fields, "hosting": {"storage_mode": os.getenv("DATA_PERSISTENCE_MODE", "unknown")}}
 @app.get("/api/fields/{fid}")
 def get_field(fid: int, u=Depends(me)): return fld(own_field(u, fid))
 
@@ -424,20 +423,12 @@ def comment_post(pid:int,b:CommentIn,u=Depends(me)):
 
 # ---------- clicked point inside an owned field ----------
 def point_in_field(lon: float, lat: float, polygon):
-    """Ray casting in lon/lat for small field polygons; boundaries count as inside."""
-    inside = False
-    for a, b in zip(polygon, polygon[1:] + polygon[:1]):
-        x1,y1 = a; x2,y2 = b
-        cross = (lon-x1)*(y2-y1) - (lat-y1)*(x2-x1)
-        if abs(cross) <= 1e-10 and min(x1,x2)-1e-9 <= lon <= max(x1,x2)+1e-9 and min(y1,y2)-1e-9 <= lat <= max(y1,y2)+1e-9:
-            return True
-        if (y1>lat)!=(y2>lat) and lon < (x2-x1)*(lat-y1)/(y2-y1)+x1:
-            inside = not inside
-    return inside
+    return geo_utils.contains_point(lon, lat, polygon)
 
 class MapPointIn(BaseModel):
     lat: float = Field(ge=-90,le=90)
     lon: float = Field(ge=-180,le=180)
+    refresh: bool = False
 
 @app.post('/api/fields/{fid}/point-conditions')
 async def point_conditions(fid: int, b: MapPointIn, u=Depends(me)):
@@ -447,13 +438,22 @@ async def point_conditions(fid: int, b: MapPointIn, u=Depends(me)):
     if not point_in_field(b.lon,b.lat,ring):
         raise HTTPException(422,'Choose a location inside the selected field boundary')
     forecast_result,power_result=await asyncio.gather(
-        agro_services.forecast(b.lat,b.lon),
-        nasa_intelligence.field_intelligence(b.lat,b.lon,30,False),
+        asyncio.wait_for(agro_services.forecast(b.lat,b.lon,refresh=b.refresh),timeout=22),
+        asyncio.wait_for(nasa_intelligence.field_intelligence(b.lat,b.lon,30,False,refresh=b.refresh),timeout=22),
         return_exceptions=True)
     result={
         'field_id':fid, 'field_name':f['name'],
         'coordinates':{'lat':b.lat,'lon':b.lon},
         'forecast':None,'power':None,'unavailable':{},
+        'provenance': {
+            'forecast': {'source':'Open-Meteo', 'type':'weather model', 'location':'selected coordinates',
+                         'note':'Forecast grid cell, not a thermometer or rain gauge at the field.'},
+            'power': {'source':'NASA POWER', 'type':'historical gridded regional estimate',
+                      'location':'grid cell containing selected coordinates',
+                      'note':'Nearby clicks can share identical NASA values. Not a parcel-scale sensor.'},
+            'imagery': {'source':'NASA GIBS', 'type':'visual raster layer',
+                        'note':'Visual layers are not numeric soil or vegetation measurements at the click point.'}
+        },
         'scope':{'forecast':'Open-Meteo numerical model at selected coordinates, NOT an in-field measurement',
                  'power':'NASA POWER gridded regional estimates; multiple clicks in one field may use the same grid cell',
                  'satellite':'GIBS map overlays are visual images, NOT numerical measurements at the clicked pixel'}
@@ -470,9 +470,9 @@ async def point_conditions(fid: int, b: MapPointIn, u=Depends(me)):
 
 # ---------- weather and field doctor ----------
 @app.get('/api/fields/{fid}/weather')
-async def field_weather(fid:int,u=Depends(me)):
+async def field_weather(fid:int,refresh:bool=False,u=Depends(me)):
     field=own_field(u,fid)
-    try: return await agro_services.forecast(field['lat'],field['lon'])
+    try: return await (agro_services.forecast(field['lat'],field['lon'],refresh=True) if refresh else agro_services.forecast(field['lat'],field['lon']))
     except Exception as e:raise HTTPException(503,f'Weather forecast unavailable: {type(e).__name__}')
 
 @app.get('/api/fields/{fid}/doctor')

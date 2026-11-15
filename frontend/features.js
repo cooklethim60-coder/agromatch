@@ -14,16 +14,26 @@ const NAV=[
  {id:'knowledge',title:'Knowledge Hub',ico:'knowledge',group:'EXPLORE'},
  {id:'reports',title:'Reports',ico:'reports',group:'EXPLORE'}];
 const moreTabs=['doctor','weather','rot','co','chat','music','knowledge','reports'];
+// Shared RU/EN navigation for Kazakhstan and international users.
+// Detailed feature content retains source-specific English text until fully translated.
+const NAV_RU={home:'Обзор',earth:'Карта и спутники',fields:'Мои поля',doctor:'Проверка поля',
+ weather:'Погода и климат',rot:'Севооборот',co:'AI-агроном',match:'Фермеры',
+ chat:'Сообщения',feed:'Сообщество',music:'Музыка полей',knowledge:'База знаний',
+ reports:'Отчёты',more:'Ещё'};
+function uiLanguage(){return localStorage.agromatchLanguage==='en'?'en':'ru'}
+function navLabel(x){return uiLanguage()==='ru'?(NAV_RU[x.id]||x.title):x.title}
+function toggleUiLanguage(){localStorage.agromatchLanguage=uiLanguage()==='ru'?'en':'ru';if(typeof closeOv==='function')closeOv();draw()}
+
 const featureIcons={fields:'<path d="M3 3h18v18H3zM3 11h18M11 3v18"/>',doctor:'<path d="M12 3v18M3 12h18M5 5l14 14"/>',weather:'<path d="M4 17a5 5 0 0 1 4-8 7 7 0 0 1 13 4 4 4 0 0 1-4 7H8z"/>',chat:'<path d="M4 4h16v12H9l-5 4z"/>',feed:'<path d="M5 5h14M5 11h14M5 17h10"/>',music:'<path d="M9 18V5l12-2v13M9 8l12-2"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',knowledge:'<path d="M3 5c3-2 6-2 9 0 3-2 6-2 9 0v15c-3-2-6-2-9 0-3-2-6-2-9 0zM12 5v15"/>',reports:'<path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7"/>',more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'};
 function shellNav(){
  const groups=['PLATFORM','INTELLIGENCE','COMMUNITY','EXPLORE'];
  const desktop=`<div class="nav-brand"><div class="brand-mark">A</div><div><b>AGROMATCH</b><small>EARTH INTELLIGENCE</small></div></div>`+
-  groups.map(g=>`<div class="nav-group"><div class="nav-label">${g}</div>${NAV.filter(x=>x.group===g).map(x=>`<button class="nav-entry ${S.tab===x.id?'on':''}" onclick="tab('${x.id}')">${ic(x.ico)}<span>${x.title}</span>${x.id==='chat'&&S.notif?`<i class="nav-count">${S.notif}</i>`:''}</button>`).join('')}</div>`).join('')+
-  `<div class="nav-footer"><span class="status-led"></span> NASA • Earth data intelligence</div>`;
+  groups.map(g=>`<div class="nav-group"><div class="nav-label">${g}</div>${NAV.filter(x=>x.group===g).map(x=>`<button class="nav-entry ${S.tab===x.id?'on':''}" onclick="tab('${x.id}')">${ic(x.ico)}<span>${navLabel(x)}</span>${x.id==='chat'&&S.notif?`<i class="nav-count">${S.notif}</i>`:''}</button>`).join('')}</div>`).join('')+
+  `<div class="nav-footer"><span class="status-led"></span> NASA • Earth data intelligence <button class="language-switch" onclick="toggleUiLanguage()" title="Русский / English">${uiLanguage()==='ru'?'English':'Русский'}</button></div>`;
  const mobile=[...NAV.filter(x=>['home','earth','fields','feed','match'].includes(x.id)),{id:'more',title:'More',ico:'more'}];
- return `<nav class="desktop-nav">${desktop}</nav><nav class="mobile-nav">${mobile.map(x=>`<button class="${S.tab===x.id||(x.id==='more'&&moreTabs.includes(S.tab))?'on':''}" onclick="${x.id==='more'?'openMore()':`tab('${x.id}')`}">${ic(x.ico)}<span>${x.title==='Satellite Earth'?'Earth':x.title==='Overview'?'Home':x.title==='My Fields'?'Fields':x.title==='Farm Feed'?'Feed':x.title==='Farm Match'?'Match':x.title}</span></button>`).join('')}</nav>`;
+ return `<nav class="desktop-nav">${desktop}</nav><nav class="mobile-nav">${mobile.map(x=>`<button class="${S.tab===x.id||(x.id==='more'&&moreTabs.includes(S.tab))?'on':''}" onclick="${x.id==='more'?'openMore()':`tab('${x.id}')`}">${ic(x.ico)}<span>${uiLanguage()==='ru'?navLabel(x):(x.title==='Satellite Earth'?'Earth':x.title==='Overview'?'Home':x.title==='My Fields'?'Fields':x.title==='Farm Feed'?'Feed':x.title==='Farm Match'?'Match':x.title)}</span></button>`).join('')}</nav>`;
 }
-function openMore(){ovOpen(`<h1>Explore AgroMatch</h1><p class="mut">Choose a workspace</p><div class="extra-menu">${NAV.map(x=>`<button onclick="closeOv();tab('${x.id}')">${ic(x.ico)}<span>${x.title}</span></button>`).join('')}</div>`)}
+function openMore(){ovOpen(`<h1>Explore AgroMatch</h1><p class="mut">Choose a workspace</p><div class="extra-menu">${NAV.map(x=>`<button onclick="closeOv();tab('${x.id}')">${ic(x.ico)}<span>${navLabel(x)}</span></button>`).join('')}</div><button class="btn o s language-mobile" onclick="toggleUiLanguage()">🌐 ${uiLanguage()==='ru'?'English':'Русский'}</button>`)}
 function selFieldHtml(action){return `<label>Selected field</label><select onchange="S.extraField=+this.value;${action}()">${S.me.fields.map(f=>`<option value="${f.id}" ${f.id===S.extraField?'selected':''}>${esc(f.name)} · ${f.area_ha} ha</option>`).join('')}</select>`}
 function ensureField(){if(!S.extraField||!S.me.fields.some(f=>f.id===S.extraField))S.extraField=S.me.fields[0]?.id||null;return S.extraField}
 function myFields(){return hdr('My Fields','Boundaries · soils · crop histories · satellites')+`<div class="section-eyebrow">MANAGED LAND · ${S.me.fields.length} FIELDS</div><div class="feature-grid">${S.me.fields.map(f=>{const s=f.snapshots[0],m=s?.metrics;return `<div class="field-tile"><div class="row sb"><div><div class="section-eyebrow">FIELD ${f.id}</div><h2>${esc(f.name)}</h2></div>${s?lvpill(s.level,s.harmony):''}</div><div class="mut">${f.area_ha} hectares · ${esc(f.soil||'Soil not recorded')}</div><div class="key-stats"><span>Rain / year <b>${m?.rain_mm??'—'} mm</b></span><span>Temperature <b>${m?.temp_c??'—'}°C</b></span></div><div class="mut source-line">${m?.simulated?tag('s'):tag('n')} ${m?.last_obs||'No observation date'}</div><div class="row tile-actions"><button class="btn s" onclick="ovField(${f.id})">Explore field</button><button class="btn o s" onclick="S.extraField=${f.id};tab('doctor')">Diagnosis</button></div></div>`}).join('')}</div><button class="btn o" onclick="S.scr='fieldEd';S.edit=null;S.pts=[];draw()">+ Draw a new field</button>`}
@@ -38,7 +48,7 @@ function weatherPage(){
  return hdr('Weather & Climate','Погода на поле · прогноз с числами и таблицей')+
  `<div class="feature-panel weather-dashboard">
  <div class="weather-toolbar">${selFieldHtml('loadWeather')}
- <button class="btn o s" onclick="loadWeather()" title="Update data">↻ Обновить прогноз</button></div>
+ <button class="btn o s" onclick="loadWeather(true)" title="Запросить свежий прогноз">↻ Обновить прогноз</button></div>
  <div id="weatherResults" class="loading-region" aria-live="polite">Загружаем прогноз погоды…</div></div>`;
 }
 function weatherNum(x,digits=0,suffix=''){
@@ -55,7 +65,7 @@ function renderWeatherDashboard(){
  const days=w.days.slice(0,S.weatherRange===3?3:7);
  const f=S.me.fields.find(z=>z.id===S.extraField);
  const m=f?.snapshots?.[0]?.metrics;
- const sum=k=>days.reduce((a,d)=>a+(Number.isFinite(Number(d[k]))&&d[k]!=null?Number(d[k]):0),0);
+ const sum=k=>days.every(d=>d[k]!=null&&Number.isFinite(Number(d[k])))?days.reduce((a,d)=>a+Number(d[k]),0):null;
  const validHigh=days.filter(d=>d.high!=null).map(d=>Number(d.high));
  const high=validHigh.length?Math.max(...validHigh):null;
  const lows=days.filter(d=>d.low!=null).map(d=>Number(d.low));
@@ -64,7 +74,7 @@ function renderWeatherDashboard(){
  const chanceMax=chance.length?Math.max(...chance):null;
  const card=(symbol,title,value,note)=>`<div class="weather-kpi"><span class="weather-kpi-label">${symbol} ${title}</span><strong>${value}</strong><small>${note}</small></div>`;
  el.innerHTML=`<div class="row sb weather-head"><div><div class="section-eyebrow">OPEN-METEO · ПРОГНОЗ</div><h2>${esc(f?.name||'Поле')}</h2><p class="mut">По координатам поля · ${esc(w.timezone||'часовой пояс модели')}</p></div><span class="tag f_">FORECAST</span></div>
- <div class="weather-filters" role="group" aria-label="Период прогноза"><span>Показать:</span><button class="chip ${S.weatherRange===3?'on':''}" onclick="S.weatherRange=3;renderWeatherDashboard()">3 дня</button><button class="chip ${S.weatherRange!==3?'on':''}" onclick="S.weatherRange=7;renderWeatherDashboard()">7 дней</button></div>
+ <p class="weather-source-hint">📍 Точки представляют расчётные ячейки погодной модели, а не локальные датчики на ферме. Полный прогноз: ${w.complete_days??"—"} из ${w.days.length} дней.</p><div class="weather-filters" role="group" aria-label="Период прогноза"><span>Показать:</span><button class="chip ${S.weatherRange===3?'on':''}" onclick="S.weatherRange=3;renderWeatherDashboard()">3 дня</button><button class="chip ${S.weatherRange!==3?'on':''}" onclick="S.weatherRange=7;renderWeatherDashboard()">7 дней</button></div>
  <div class="weather-kpis">
  ${card('🌡️','Макс. температура',weatherNum(high,1,' °C'),'За выбранный период')}
  ${card('❄️','Мин. температура',weatherNum(low,1,' °C'),'За выбранный период')}
@@ -86,13 +96,13 @@ function renderWeatherDashboard(){
  <p class="mut">Источник: ${esc(m.source||'не указан')} ${m.simulated?tag('s'):tag('n')}</p>`:'<p class="mut">Нет исторических измерений для этого поля.</p>'}
  <div class="footnote">Прогноз: ${esc(w.source)} · получен ${new Date(w.fetched_at*1000).toLocaleString('ru-RU')} · ${esc(w.limitations)}. Погодные прогнозы не являются измерениями датчиков на поле.</div>`;
 }
-async function loadWeather(){
+async function loadWeather(refresh=false){
  const el=$('#weatherResults');if(!el)return;
  const fid=S.extraField;
  S.weatherData=null;
  el.innerHTML='<p class="mut">Получаем свежий прогноз погоды…</p>';
  try{
-  const w=await api(`/fields/${fid}/weather`);
+  const w=await api(`/fields/${fid}/weather${refresh?'?refresh=true':''}`);
   if(S.extraField!==fid||!$('#weatherResults'))return;
   S.weatherData=w;
   S.weatherRange=S.weatherRange===3?3:7;
@@ -109,7 +119,7 @@ async function likePost(id){await tryit(async()=>{await api(`/feed/${id}/like`,{
 async function addComment(id){await tryit(async()=>{const val=$('#comment-'+id)?.value.trim();if(!val)return;await api(`/feed/${id}/comments`,{b:{body:val}});await loadFeed()})}
 function knowledgePage(){return hdr('Knowledge Hub','Agricultural concepts made practical')+`<div class="feature-panel"><div class="row"><input id="ksearch" placeholder="Search soil, rotation, NDVI…" onkeydown="if(event.key==='Enter')loadKnowledge()"><button class="btn s" onclick="loadKnowledge()">Search</button></div><select id="kcategory" onchange="loadKnowledge()"><option value="">All topics</option>${['Satellite intelligence','Crop rotation','Soil health','Soil & water','Climate resilience','Sustainable agriculture'].map(x=>`<option>${x}</option>`).join('')}</select></div><div id="knowledgeResults" class="knowledge-grid loading-region">Loading guides…</div>`}
 async function loadKnowledge(){const el=$('#knowledgeResults');if(!el)return;try{const results=await api('/knowledge?q='+encodeURIComponent($('#ksearch')?.value||'')+'&category='+encodeURIComponent($('#kcategory')?.value||''));if(!$('#knowledgeResults'))return;el.innerHTML=results.length?results.map(a=>`<button class="knowledge-tile" onclick="openArticle('${a.id}')"><span class="section-eyebrow">${esc(a.category).toUpperCase()}</span><b>${esc(a.title)}</b><span class="mut">${a.reading_minutes} min read · Field guide</span><span class="read-more">Read article →</span></button>`).join(''):'<p class="mut">No guides match that search.</p>'}catch(e){el.innerHTML=`<p class="warn">${esc(e.message)}</p>`}}
-async function openArticle(id){await tryit(async()=>{const a=await api('/knowledge/'+id);ovOpen(`<div class="section-eyebrow">${esc(a.category).toUpperCase()}</div><h1 class="article-title">${esc(a.title)}</h1><p class="mut">AgroMatch knowledge guide</p><div class="article-body">${esc(a.body)}</div><div class="footnote">General education only. Check local agronomic guidance and observations.</div>`)})}
+async function openArticle(id){await tryit(async()=>{const a=await api('/knowledge/'+id);ovOpen(`<div class="section-eyebrow">${esc(a.category).toUpperCase()}</div><h1 class="article-title">${esc(a.title)}</h1><p class="mut">AgroMatch knowledge guide</p><div class="article-body">${esc(a.body)}</div><div class="footnote">General education only. Check local agronomic guidance and observations.</div><button class="btn o s language-mobile" onclick="toggleUiLanguage()">🌐 ${uiLanguage()==='ru'?'English':'Русский'}</button>`)})}
 function reportsPage(){return hdr('Reports','Clear field evidence, ready to share')+`<div class="feature-panel"><div class="section-eyebrow">FIELD INTELLIGENCE REPORTS</div><h2>Export observations and recommendations</h2><p class="mut">Reports contain farmer data, NASA POWER history, AppEEARS observations if available, and rule-based inspection flags. No measurements are fabricated.</p></div>${S.me.fields.map(f=>`<div class="field-tile"><div class="row sb"><b>${esc(f.name)}</b><span class="mut">${f.area_ha} ha</span></div><p class="mut">Print a report or export the underlying observations.</p><div class="row"><button class="btn s" onclick="openReport(${f.id})">Print / save PDF</button><button class="btn o s" onclick="exportReport(${f.id})">Export CSV</button></div></div>`).join('')}`}
 async function reportFetch(fid,ext){const response=await fetch(`/api/reports/fields/${fid}.${ext}`,{headers:{Authorization:'Bearer '+T}});if(!response.ok)throw new Error('Report unavailable ('+response.status+')');return response}
 function openReport(fid){const w=window.open('','_blank');if(!w){toast('Allow pop-ups to print reports');return}w.document.write('<title>Loading report…</title><p>Preparing field report…</p>');(async()=>{try{const r=await reportFetch(fid,'html');const text=await r.text();w.document.open();w.document.write(text);w.document.close()}catch(e){w.document.body.textContent=e.message}})()}
@@ -126,7 +136,7 @@ async function loadSatellite(){const el=$('#satelliteResults');if(!el)return;el.
 async function submitSatellite(){await tryit(async()=>{const product=$('#nasaProduct')?.value,layer=$('#nasaLayer')?.value;if(product&&!layer)throw new Error('Select a verified layer first');const x=await api(`/fields/${S.extraField}/satellite/tasks`,{b:product?{product,layer}:{}});toast('NASA extraction task submitted');await loadSatellite()})}
 async function refreshSatellite(id){await tryit(async()=>{const x=await api(`/fields/${S.extraField}/satellite/tasks/${id}/refresh`,{b:{}});toast('NASA task: '+x.status);await loadSatellite()})}
 async function loadHomePreview(){const fid=S.me.fields[0]?.id;if(!fid)return;
- try{const w=await api(`/fields/${fid}/weather`);if($('#homeForecast'))$('#homeForecast').innerHTML=`<div class="key-stats"><span>High today <b>${Math.round(w.days[0].high)}°C</b></span><span>7-day rain <b>${Math.round(w.days.reduce((a,b)=>a+(b.rain||0),0))} mm</b></span></div>${w.warnings.length?`<p class="mut">${esc(w.warnings[0].text)}</p>`:'<p class="mut">No weather thresholds exceeded.</p>'}`;}catch(e){if($('#homeForecast'))$('#homeForecast').textContent='Forecast unavailable. Historical NASA data remains available.'}
+ try{const w=await api(`/fields/${fid}/weather`);if($('#homeForecast'))$('#homeForecast').innerHTML=`<div class="key-stats"><span>High today <b>${weatherNum(w.days[0]?.high,0,' °C')}</b></span><span>7-day rain <b>${(w.days.every(d=>d.rain!=null)?weatherNum(w.days.reduce((a,b)=>a+Number(b.rain),0),1,' мм'):'—')}</b></span></div>${w.warnings.length?`<p class="mut">${esc(w.warnings[0].text)}</p>`:'<p class="mut">No weather thresholds exceeded.</p>'}`;}catch(e){if($('#homeForecast'))$('#homeForecast').textContent='Forecast unavailable. Historical NASA data remains available.'}
  try{const feed=await api('/feed?limit=3');if($('#homeFeed'))$('#homeFeed').innerHTML=feed.length?feed.map(p=>`<p class="mut"><b>${esc(p.author)}</b>: ${esc(p.body.slice(0,100))}</p>`).join(''):'<p class="mut">No community posts yet.</p>';}catch(e){if($('#homeFeed'))$('#homeFeed').textContent='Community unavailable.'}
 }
 function extraAfter(){if(S.scr!=='app')return;({home:loadHomePreview,doctor:loadDoctor,weather:loadWeather,feed:loadFeed,knowledge:loadKnowledge,earth:()=>{loadSatellite();loadEarthIntelligence()},music:loadSymphonyContext})[S.tab]?.()}

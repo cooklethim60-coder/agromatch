@@ -25,7 +25,7 @@ const fc=f=>({type:'FeatureCollection',features:f});
 const polyF=(f)=>({type:'Feature',properties:{id:f.id,name:f.name},geometry:{type:'Polygon',coordinates:[[...f.polygon,f.polygon[0]]]}});
 function addFields(m,fields,sel){m.addSource('flds',{type:'geojson',data:fc(fields.map(polyF))});m.addLayer({id:'ffill',type:'fill',source:'flds',paint:{'fill-color':'#7CFC9A','fill-opacity':.25}});m.addLayer({id:'fline',type:'line',source:'flds',paint:{'line-color':'#fff','line-width':2.5}});if(sel)m.on('click','ffill',e=>sel(e.features[0].properties.id,e.lngLat));}
 function fit(m,pts){const b=new maplibregl.LngLatBounds(pts[0],pts[0]);pts.forEach(p=>b.extend(p));m.fitBounds(b,{padding:40,duration:0,maxZoom:17})}
-async function geocode(q){const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q));const j=await r.json();if(!j.length)throw new Error('Place not found');return{lat:+j[0].lat,lon:+j[0].lon,name:j[0].display_name}}
+async function geocode(q){const m=String(q||'').trim().match(/^(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)$/);if(m){const lat=Number(m[1]),lon=Number(m[2]);if(lat>=-90&&lat<=90&&lon>=-180&&lon<=180)return {lat,lon,name:'Coordinates'};throw new Error('Coordinates must be latitude, longitude in valid ranges')}const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q));const j=await r.json();if(!j.length)throw new Error('Place not found');return{lat:+j[0].lat,lon:+j[0].lon,name:j[0].display_name}}
 const LAY={sat:{n:'Satellite',src:'Esri World Imagery (not NASA)',res:'≈0.3–10 m, varies',unit:'RGB',freq:'Mosaic, mixed dates',lim:'Acquisition date varies by location; not a time series.'},
 ndvi:{n:'Vegetation',id:'MODIS_Terra_NDVI_8Day',lvl:9,ext:'png',src:'NASA MODIS Terra NDVI via GIBS',res:'250 m',unit:'NDVI (unitless, −1…1)',freq:'8-day composite',lim:'Clouds cause gaps; 250 m pixels blend small fields.'},
 rain:{n:'Rainfall',id:'IMERG_Precipitation_Rate',lvl:6,ext:'png',src:'NASA GPM IMERG via GIBS',res:'≈10 km (0.1°)',unit:'mm/hr',freq:'30 minutes',lim:'Too coarse for single-field rainfall.'},
@@ -66,12 +66,13 @@ const saveField=()=>tryit(async()=>{if(S.pts.length<3)throw new Error('Draw at l
 /* ---------- home ---------- */
 function alerts(f){const m=f.snapshots[0].metrics,out=[];if(m.wetness<.3)out.push(['Low root-zone soil wetness ('+m.wetness+')','warn']);if(m.trend<-.04)out.push(['Soil wetness declining vs 12 months ago','warn']);if(m.rain_cv>1.3)out.push(['Erratic monthly rainfall (CV '+m.rain_cv+')','warn']);return out.map(a=>`<div class="warn">${f.name}: ${a[0]} · ${m.simulated?tag('s'):tag('n')}</div>`).join('')}
 function home(){const fs=S.me.fields,farm=S.me.farm,first=fs[0];return hdr('Hello, '+esc(S.me.user.name||'farmer'),esc(farm.name)+' · '+esc(farm.region))+
+(S.me?.hosting?.storage_mode==='ephemeral'?'<div class="data-retention-note"><b>⚠️ Демонстрационный режим / Demo mode.</b> Бесплатный Render не сохраняет SQLite надёжно после перезапуска или нового развёртывания. Экспортируйте нужные данные. / Data may be lost on restart or redeploy.</div>':'')+
 `<div class="hero-panel"><div class="hero-eyebrow">INTELLIGENCE FROM ABOVE</div><h2>Better decisions begin with understanding the land.</h2><p>Connect climate intelligence, field observations and grower experience. From orbit to action.</p><button class="btn s" onclick="tab('earth')">Explore Earth →</button></div>`+
 `<div class="section-eyebrow">FARM AT A GLANCE</div><div class="g2"><div class="metric"><span class="mut">Fields monitored</span><b>${fs.length}</b></div><div class="metric"><span class="mut">Total area</span><b>${fs.reduce((a,f)=>a+f.area_ha,0).toFixed(1)} ha</b></div></div><div class="row sb" style="margin-top:20px"><h2>My fields</h2><button class="chip" onclick="tab('fields')">View all</button></div><div class="feature-grid">${fs.map(f=>{const s=f.snapshots[0],m=s?.metrics;return `<div class="field-tile" onclick="ovField(${f.id})"><div class="row sb"><h3>${esc(f.name)}</h3>${s?lvpill(s.level,s.harmony):''}</div><div class="mut">${f.area_ha} ha · ${esc(f.soil||'soil unknown')} · ${m?.simulated?tag('s'):tag('n')}</div><div class="key-stats"><span>Rain / year<b>${m?.rain_mm??'—'} mm</b></span><span>Mean temperature<b>${m?.temp_c??'—'} °C</b></span></div><span class="read-more">Explore field →</span></div>`}).join('')}</div><button class="btn o" onclick="S.scr='fieldEd';S.edit=null;S.pts=[];draw()">+ Add field</button><div class="row sb" style="margin-top:20px"><h2>Early signals</h2><button class="chip" onclick="tab('doctor')">Field Doctor</button></div>${fs.map(alerts).join('')||'<p class="mut">No thresholds triggered. Routine inspection remains important.</p>'}<div class="feature-grid"><div class="feature-panel"><div class="section-eyebrow">WEATHER OUTLOOK</div><h2>Next 7 days</h2><div id="homeForecast"><p class="mut">Loading forecast…</p></div><button class="btn o s" onclick="tab('weather')">Full climate view</button></div><div class="feature-panel"><div class="section-eyebrow">FARM COMMUNITY</div><h2>Grower updates</h2><div id="homeFeed"><p class="mut">Loading community…</p></div><button class="btn o s" onclick="tab('feed')">Open Farm Feed</button></div></div><div class="mut">NASA POWER provides coarse regional climate context, not measurements at each field. Last available data: ${first?.snapshots[0]?.metrics.last_obs||'unknown'}.</div>`}
 /* ---------- earth ---------- */
 function earth(){const d=new Date(Date.now()-10*864e5).toISOString().slice(0,10);
  return hdr('Earth','Нажми на выделенное поле → получи погоду и региональные NASA-данные для выбранной точки')+
- `<div class="earth-search"><input id="eq" placeholder="Поиск населённого пункта" aria-label="Поиск места"><button class="btn s" onclick="tryit(async()=>{const g=await geocode($('#eq').value);maps.earth.flyTo({center:[g.lon,g.lat],zoom:13,pitch:45})})">Найти</button><button class="btn o s" onclick="zoomToMyFields()">Мои поля</button></div>
+ `<div class="earth-search"><input id="eq" placeholder="Город или координаты: 43.24, 76.92" aria-label="Поиск места"><button class="btn s" onclick="tryit(async()=>{const g=await geocode($('#eq').value);maps.earth.flyTo({center:[g.lon,g.lat],zoom:13,pitch:45})})">Найти</button><button class="btn o s" onclick="zoomToMyFields()">Мои поля</button></div>
  <div class="earth-controls"><div class="section-eyebrow">СЛОЙ КАРТЫ</div><div id="lays" class="earth-layer-tabs">${Object.entries(LAY).map(([k,v])=>`<button class="chip ${k==S.layer?'on':''}" data-k="${k}" onclick="setLayer('${k}',$('#ed').value)">${esc(v.n)}</button>`).join('')}</div>
  <div class="earth-options"><label>Дата снимка <input type="date" id="ed" value="${d}" max="${new Date().toISOString().slice(0,10)}" onchange="setLayer(S.layer,this.value)"></label><button class="btn o s" onclick="const m=maps.earth;m.easeTo({pitch:m.getPitch()>10?0:60})">2D / 3D</button></div></div>
  <div class="earth-map-wrap"><div id="earth" class="map big"></div><div class="earth-map-hint">📍 Нажмите внутри зелёного контура своего поля, чтобы увидеть условия именно в выбранной точке.</div></div>
@@ -85,9 +86,9 @@ function zoomToMyFields(){
  if(pts.length)fit(m,pts);
 }
 function pointMetric(name,value,unit='',note=''){
- return `<div class="earth-point-metric"><span>${name}</span><strong>${value===null||value===undefined?'—':esc(value)}${unit}</strong><small>${note}</small></div>`;
+ return `<div class="earth-point-metric"><span>${esc(name)}</span><strong>${value===null||value===undefined?'—':esc(value)}${esc(unit)}</strong><small>${esc(note)}</small></div>`;
 }
-async function loadMapPoint(fid,lat,lon){
+async function loadMapPoint(fid,lat,lon,refresh=false){
  const el=$('#esel');if(!el)return;
  const f=S.me.fields.find(x=>x.id===fid);if(!f)return;
  if(S.earthMarker){S.earthMarker.remove();S.earthMarker=null}
@@ -95,8 +96,9 @@ async function loadMapPoint(fid,lat,lon){
  const seq=S.earthPointSeq=(S.earthPointSeq||0)+1;
  el.innerHTML=`<div class="feature-panel"><h2>${esc(f.name)}</h2><p class="mut">Получаем реальные данные для выбранной точки (${lat.toFixed(5)}, ${lon.toFixed(5)})…</p></div>`;
  try{
-  const r=await api(`/fields/${fid}/point-conditions`,{b:{lat,lon}});
+  const r=await api(`/fields/${fid}/point-conditions`,{b:{lat,lon,refresh}});
   if(seq!==S.earthPointSeq||!$('#esel'))return;
+  S.pointReport=r;
   const w=r.forecast, d=w?.days?.[0]||{}, power=r.power, ind=power?.indicators||{};
   let weatherHtml='<p class="warn">Прогноз недоступен: '+esc(r.unavailable?.forecast||'нет данных')+'</p>';
   if(w){
@@ -125,9 +127,19 @@ async function loadMapPoint(fid,lat,lon){
   <div class="row sb"><div><div class="section-eyebrow">ВЫБРАННАЯ ТОЧКА</div><h2>${esc(f.name)}</h2><p class="mut">Широта: ${lat.toFixed(5)} · Долгота: ${lon.toFixed(5)} · ${Number(f.area_ha).toLocaleString('ru-RU')} га</p></div><span class="tag f_">API</span></div>
   <h3>🌦️ Прогноз сегодня · Open-Meteo</h3>${weatherHtml}
   <h3>🛰️ NASA POWER · доступные данные за 30 дней</h3>${nasaHtml}
-  <div class="earth-point-actions"><button class="btn s" onclick="S.extraField=${fid};tab('weather')">Прогноз на 7 дней</button><button class="btn o s" onclick="ovField(${fid})">Информация о поле</button><button class="btn o s" onclick="loadMapPoint(${fid},${lat},${lon})">↻ Обновить</button></div>
-  <p class="footnote">Спутниковая картинка NASA GIBS не означает числовое измерение в точке. Прогноз и NASA POWER имеют пространственные ограничения.</p></div>`;
+  <div class="earth-point-actions"><button class="btn s" onclick="S.extraField=${fid};tab('weather')">Прогноз на 7 дней</button><button class="btn o s" onclick="ovField(${fid})">Информация о поле</button><button class="btn o s" onclick="loadMapPoint(${fid},${lat},${lon},true)">↻ Обновить</button></div>
+  <button class="btn o s" onclick="downloadPointReport()">⬇ Скачать данные точки (JSON)</button><div class="earth-provenance"><b>Происхождение и точность</b><p>🟦 <b>Open-Meteo:</b> метеорологическая модель по координатам; это прогноз, а не показание датчика.</p><p>🟩 <b>NASA POWER:</b> исторические значения в региональной ячейке сетки, могут быть одинаковыми для соседних участков.</p><p>🛰️ <b>NASA GIBS:</b> визуальные спутниковые изображения без числовых измерений по клику.</p></div><p class="footnote">Отсутствующие данные показаны знаком «—»; численные значения нельзя считать полевыми измерениями.</p></div>`;
  }catch(e){if(seq===S.earthPointSeq&&$('#esel'))$('#esel').innerHTML='<div class="warn">Ошибка данных: '+esc(e.message)+'</div>'}
+}
+function downloadPointReport(){
+ if(!S.pointReport){toast('Сначала выберите точку на карте');return;}
+ const report=S.pointReport;
+ const filename='agromatch-field-'+report.field_id+'-point.json';
+ const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json;charset=utf-8'});
+ const url=URL.createObjectURL(blob);
+ const link=document.createElement('a');
+ link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 function after(){if(S.scr=='fieldEd'){const m=mkMap('fed',{center:S.me.farm?[S.me.farm.lon,S.me.farm.lat]:[0,20],zoom:S.me.farm?15:2,onload:m=>{m.addSource('draw',{type:'geojson',data:geo(S.pts)});m.addLayer({id:'dfill',type:'fill',source:'draw',filter:['==','$type','Polygon'],paint:{'fill-color':'#7CFC9A','fill-opacity':.3}});m.addLayer({id:'dline',type:'line',source:'draw',filter:['==','$type','LineString'],paint:{'line-color':'#fff','line-width':2.5}});m.addLayer({id:'dpt',type:'circle',source:'draw',filter:['==','$type','Point'],paint:{'circle-radius':5,'circle-color':'#1F4D36','circle-stroke-color':'#fff','circle-stroke-width':2}});if(S.edit){const f=S.me.fields.find(x=>x.id==S.edit);if(!S.pts.length)S.pts=f.polygon.slice();upd();fit(m,S.pts)}}});m.on('click',e=>{S.pts.push([e.lngLat.lng,e.lngLat.lat]);upd()});m.getCanvas().style.cursor='crosshair'}
  if(S.scr=='farmSetup'){const f=S.me?.farm,m=mkMap('fmap',{center:f?[f.lon,f.lat]:[0,20],zoom:f?11:1.4});m.on('click',e=>setLoc(e.lngLat.lat,e.lngLat.lng,''));if(f){S.mk=new maplibregl.Marker({color:'#1F4D36'}).setLngLat([f.lon,f.lat]).addTo(m)}}
