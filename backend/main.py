@@ -143,7 +143,7 @@ async def edit_field(fid: int, b: FieldIn, u=Depends(me)): own_field(u, fid); re
 @app.get("/api/me")
 def get_me(u=Depends(me)):
     f = u["farm"]; fields = [fld(r) for r in q("SELECT * FROM fields WHERE farm_id=?", (f["id"],))] if f else []
-    return {"user": {"id": u["id"], "name": u["name"], "email": u["email"]}, "farm": f, "fields": fields}
+    return {"user": {"id": u["id"], "name": u["name"], "email": u["email"]}, "farm": f, "fields": fields, "hosting": {"storage_mode": os.getenv("DATA_PERSISTENCE_MODE", "unknown")}}
 @app.get("/api/fields/{fid}")
 def get_field(fid: int, u=Depends(me)): return fld(own_field(u, fid))
 
