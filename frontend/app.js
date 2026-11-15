@@ -40,13 +40,13 @@ let planetSpinTimer=null;
 function stopPlanetSpin(){
  if(planetSpinTimer){clearInterval(planetSpinTimer);planetSpinTimer=null;}
  const b=document.getElementById('planetSpin');
- if(b){b.setAttribute('aria-pressed','false');b.textContent='▶ '+(uiLanguage()==='ru'?'Вращение':'Auto rotate');}
+ if(b&&typeof b.setAttribute==='function'){b.setAttribute('aria-pressed','false');b.textContent='▶ '+(uiLanguage()==='ru'?'Вращение':'Auto rotate');}
 }
 function togglePlanetSpin(){
  if(planetSpinTimer){stopPlanetSpin();return;}
  const m=maps.earth;if(!m||!window.maplibregl)return;
  const b=document.getElementById('planetSpin');
- if(b){b.setAttribute('aria-pressed','true');b.textContent='Ⅱ '+(uiLanguage()==='ru'?'Остановить':'Stop rotation');}
+ if(b&&typeof b.setAttribute==='function'){b.setAttribute('aria-pressed','true');b.textContent='Ⅱ '+(uiLanguage()==='ru'?'Остановить':'Stop rotation');}
  m.easeTo({zoom:Math.min(m.getZoom(),3),pitch:0,duration:650});
  planetSpinTimer=setInterval(()=>{
   if(maps.earth!==m){stopPlanetSpin();return;}
@@ -65,7 +65,7 @@ function planetTerrain(){
  S.planetTerrainOff=!S.planetTerrainOff;
  m.setTerrain(S.planetTerrainOff?null:{source:'dem',exaggeration:1.3});
  const b=document.getElementById('planetTerrain');
- if(b)b.setAttribute('aria-pressed',String(!S.planetTerrainOff));
+ if(b&&typeof b.setAttribute==='function')b.setAttribute('aria-pressed',String(!S.planetTerrainOff));
 }
 function planetFullscreen(){
  const el=document.querySelector('.earth-map-wrap');if(!el)return;
