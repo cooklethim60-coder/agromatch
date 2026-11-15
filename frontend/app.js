@@ -35,6 +35,48 @@ function setLayer(k,date){const m=maps.earth;if(!m||!window.maplibregl)return;S.
  document.querySelectorAll('#lays .chip').forEach(c=>c.classList.toggle('on',c.dataset.k==k));$('#einfo').innerHTML=`<b>${L.n}</b> ${L.id?tag('n'):''}<div class="mut">Source: ${L.src}<br>Date: ${L.id?date:'n/a'} · Resolution: ${L.res} · Units: ${L.unit} · Frequency: ${L.freq}</div><div class="warn">${L.lim} Missing tiles = no observation for that date.</div>`}
 function setLayerOpacity(pct){const value=Math.max(0,Math.min(100,Number(pct)||0));S.layerOpacity=value/100;const map=maps.earth;if(map&&window.maplibregl&&map.getLayer('gibs'))map.setPaintProperty('gibs','raster-opacity',S.layerOpacity);const label=$('#opacityValue');if(label)label.textContent=value+'%'}
 function shiftEarthDate(days){const input=$('#ed');if(!input?.value)return;const date=new Date(input.value+'T12:00:00Z');if(Number.isNaN(date.getTime()))return;date.setUTCDate(date.getUTCDate()+days);const max=new Date();if(date>max)date.setTime(max.getTime());input.value=date.toISOString().slice(0,10);setLayer(S.layer,input.value)}
+/* ---------- Planet Command: interactive globe ---------- */
+let planetSpinTimer=null;
+function stopPlanetSpin(){
+ if(planetSpinTimer){clearInterval(planetSpinTimer);planetSpinTimer=null;}
+ const b=document.getElementById('planetSpin');
+ if(b&&typeof b.setAttribute==='function'){b.setAttribute('aria-pressed','false');b.textContent='▶ '+(uiLanguage()==='ru'?'Вращение':'Auto rotate');}
+}
+function togglePlanetSpin(){
+ if(planetSpinTimer){stopPlanetSpin();return;}
+ const m=maps.earth;if(!m||!window.maplibregl)return;
+ const b=document.getElementById('planetSpin');
+ if(b&&typeof b.setAttribute==='function'){b.setAttribute('aria-pressed','true');b.textContent='Ⅱ '+(uiLanguage()==='ru'?'Остановить':'Stop rotation');}
+ m.easeTo({zoom:Math.min(m.getZoom(),3),pitch:0,duration:650});
+ planetSpinTimer=setInterval(()=>{
+  if(maps.earth!==m){stopPlanetSpin();return;}
+  if(m.isMoving())return;
+  const c=m.getCenter();
+  m.jumpTo({center:[((c.lng+0.18+540)%360)-180,c.lat],bearing:0});
+ },100);
+}
+function planetFly(lon,lat,zoom=4,pitch=30){
+ stopPlanetSpin();const m=maps.earth;if(!m)return;
+ m.flyTo({center:[lon,lat],zoom,pitch,bearing:0,speed:1.1,essential:true});
+}
+function planetReset(){planetFly(68,32,1.45,0);}
+function planetTerrain(){
+ const m=maps.earth;if(!m||!m.setTerrain)return;
+ S.planetTerrainOff=!S.planetTerrainOff;
+ m.setTerrain(S.planetTerrainOff?null:{source:'dem',exaggeration:1.3});
+ const b=document.getElementById('planetTerrain');
+ if(b&&typeof b.setAttribute==='function')b.setAttribute('aria-pressed',String(!S.planetTerrainOff));
+}
+function planetFullscreen(){
+ const el=document.querySelector('.earth-map-wrap');if(!el)return;
+ if(document.fullscreenElement){document.exitFullscreen?.().catch(()=>{});return;}
+ if(el.requestFullscreen)el.requestFullscreen().then(()=>setTimeout(()=>maps.earth?.resize?.(),150)).catch(()=>toast('Fullscreen is unavailable'));
+ else toast('Fullscreen is unavailable');
+}
+function updatePlanetHud(){
+ const m=maps.earth,h=document.getElementById('planetHud');if(!m||!h||!m.getCenter)return;
+ const c=m.getCenter();h.textContent=c.lat.toFixed(3)+'° / '+c.lng.toFixed(3)+'°  ·  Z'+m.getZoom().toFixed(1);
+}
 /* ---------- audio player ---------- */
 const P={a:new Audio(),ctx:null,an:null};P.a.crossOrigin='anonymous';
 function play(t){S.cur=t;P.a.src=t.url;P.ctx&&P.ctx.resume();P.a.play().catch(()=>{});$('#player').style.display='block';$('#pt').textContent=t.title+' · '+t.level;if(!P.ctx){P.ctx=new AudioContext();const s=P.ctx.createMediaElementSource(P.a);P.an=P.ctx.createAnalyser();P.an.fftSize=64;s.connect(P.an);P.an.connect(P.ctx.destination);viz()}}
@@ -47,7 +89,7 @@ let ws;function connect(){if(!T)return;ws=new WebSocket((location.protocol=='htt
 async function refresh(){try{S.matches=await api('/matches');S.notif=S.matches.reduce((a,m)=>a+m.unread,0);S.notifN=(await api('/notifications')).filter(n=>!n.is_read).length;if(S.scr=='app'&&['disc','home','chat'].includes(S.tab)&&!S.ov&&!S.thread)draw()}catch(e){}}
 /* ---------- shell ---------- */
 function hdr(t,sub){return`<header class="app-topbar"><div class="topbar-title-wrap"><span class="topbar-eyebrow">AGROMATCH / EARTH INTELLIGENCE</span><h1>${t}</h1><div class="topbar-sub">${sub||''}</div></div><div class="topbar-actions"><button class="ic" onclick="ovNotif()" aria-label="Notifications" title="Notifications" style="position:relative">${ic('bell')}${S.notifN?`<span class="dot" style="position:absolute;top:-2px;right:-2px">${S.notifN}</span>`:''}</button><button class="ic" onclick="ovSet()" aria-label="Settings" title="Settings">${ic('gear')}</button></div></header>`}
-function draw(){document.documentElement.lang=uiLanguage();$('#app').dataset.screen=S.scr;Object.keys(maps).forEach(k=>{if(k!='ovmap'){maps[k].remove();delete maps[k]}});const m=$('#main');document.querySelectorAll('nav').forEach(e=>e.remove());const F={onb,auth,farmSetup,fieldEd,boot:()=>'<p class="mut">Loading…</p>'}[S.scr];const views={home,earth,disc,rot,co,fields:myFields,doctor:doctorPage,weather:weatherPage,match:matchPage,chat:chatPage,feed:feedPage,music:farmSymphonyPage,knowledge:knowledgePage,reports:reportsPage};m.innerHTML=F?F():(views[S.tab]||home)();if(S.scr=='app'){$('#app').insertAdjacentHTML('beforeend',shellNav());after();extraAfter()}else{after()}}
+function draw(){stopPlanetSpin();document.documentElement.lang=uiLanguage();$('#app').dataset.screen=S.scr;Object.keys(maps).forEach(k=>{if(k!='ovmap'){maps[k].remove();delete maps[k]}});const m=$('#main');document.querySelectorAll('nav').forEach(e=>e.remove());const F={onb,auth,farmSetup,fieldEd,boot:()=>'<p class="mut">Loading…</p>'}[S.scr];const views={home,earth,disc,rot,co,fields:myFields,doctor:doctorPage,weather:weatherPage,match:matchPage,chat:chatPage,feed:feedPage,music:farmSymphonyPage,knowledge:knowledgePage,reports:reportsPage};m.innerHTML=F?F():(views[S.tab]||home)();if(S.scr=='app'){$('#app').insertAdjacentHTML('beforeend',shellNav());after();extraAfter()}else{after()}}
 function tab(t){S.tab=t;draw();const main=$('#main');if(main)main.scrollTop=0}
 async function boot(){try{await load();S.scr=!S.me.farm?'farm':!S.me.fields.length?'field':'app';if(S.scr=='farm')S.scr='farmSetup';if(S.scr=='field')S.scr='fieldEd';connect()}catch(e){S.scr='auth'}draw()}
 async function load(){S.me=await api('/me');if(S.me.farm){S.matches=await api('/matches');S.notif=S.matches.reduce((a,m)=>a+m.unread,0);S.notifN=(await api('/notifications')).filter(n=>!n.is_read).length;try{S.disc=await api('/discover');S.disc.concat(S.matches.map(m=>m.farm)).forEach(c=>S.known[c.id]=c)}catch(e){S.disc=[]}}}
@@ -205,7 +247,7 @@ function earth(){
   </div>
   <div class="earth-workspace-grid">
    <div class="earth-workspace-map">
-    <div class="earth-map-wrap"><div id="earth" class="map big" role="region" aria-label="${t('Спутниковая карта полей','Satellite field map')}"></div><div class="earth-map-hint">↗ ${t('Нажмите внутри зелёного контура, чтобы получить условия для точки.','Click inside a green field boundary to inspect conditions at that point.')}</div></div>
+    <div class="earth-map-wrap planet-command"><div class="planet-top-overlay"><span class="planet-live"><i></i> EARTH / LIVE MAP</span><span class="planet-satellite">ESRI IMAGERY · NASA OVERLAYS</span></div><div class="planet-quick-locations" role="group" aria-label="Global navigation"><button onclick="planetReset()" title="Whole Earth">🌐 <span>Earth</span></button><button onclick="planetFly(76.945,43.239,10,55)" title="Almaty">⌖ <span>Almaty</span></button><button onclick="planetFly(68,48,4.4,35)" title="Kazakhstan">◈ <span>Kazakhstan</span></button><button onclick="zoomToMyFields()" title="Saved fields">▦ <span>${t("Мои поля","My fields")}</span></button></div><div class="planet-map-actions" role="group" aria-label="Globe controls"><button id="planetSpin" onclick="togglePlanetSpin()" aria-pressed="false">▶ ${t("Вращение","Auto rotate")}</button><button id="planetTerrain" onclick="planetTerrain()" aria-pressed="true">△ 3D</button><button onclick="planetFullscreen()">⛶ ${t("Экран","Fullscreen")}</button></div><div class="planet-hud"><span class="planet-hud-pulse"></span><span id="planetHud">43.239° / 76.945° · Z1.5</span></div><div id="earth" class="map big" role="region" aria-label="${t('Спутниковая карта полей','Satellite field map')}"></div><div class="earth-map-hint">↗ ${t('Нажмите внутри зелёного контура, чтобы получить условия для точки.','Click inside a green field boundary to inspect conditions at that point.')}</div></div>
     <div id="einfo" class="earth-layer-info card"></div>
    </div>
    <aside id="esel" class="point-panel"><div class="feature-panel point-idle"><span class="point-idle-mark">⌖</span><div class="section-eyebrow">${t('ИНСПЕКТОР ТОЧКИ','POINT INSPECTOR')}</div><h2>${t('Выберите точку на карте','Select a point on the map')}</h2><p class="mut">${t('Кликните внутри сохранённого поля. Мы покажем прогноз и исторические региональные данные NASA для этих координат.','Click inside a saved field. The inspector shows a forecast and regional NASA history for those coordinates.')}</p><div class="point-idle-detail">Open-Meteo · NASA POWER</div><p class="footnote">${t('Прогноз и спутниковая сетка не заменяют локальные датчики и осмотр участка.','Forecasts and gridded data are not substitutes for sensors or field inspection.')}</p></div></aside>
@@ -292,7 +334,7 @@ function after(){
  }
  if(S.scr=='fieldEd'){const m=mkMap('fed',{center:S.me.farm?[S.me.farm.lon,S.me.farm.lat]:[0,20],zoom:S.me.farm?15:2,onload:m=>{m.addSource('draw',{type:'geojson',data:geo(S.pts)});m.addLayer({id:'dfill',type:'fill',source:'draw',filter:['==','$type','Polygon'],paint:{'fill-color':'#7CFC9A','fill-opacity':.3}});m.addLayer({id:'dline',type:'line',source:'draw',filter:['==','$type','LineString'],paint:{'line-color':'#fff','line-width':2.5}});m.addLayer({id:'dpt',type:'circle',source:'draw',filter:['==','$type','Point'],paint:{'circle-radius':5,'circle-color':'#1F4D36','circle-stroke-color':'#fff','circle-stroke-width':2}});if(S.edit){const f=S.me.fields.find(x=>x.id==S.edit);if(!S.pts.length)S.pts=f.polygon.slice();upd();fit(m,S.pts)}}});m.on('click',e=>{S.pts.push([e.lngLat.lng,e.lngLat.lat]);upd()});m.getCanvas().style.cursor='crosshair'}
  if(S.scr=='farmSetup'){const f=S.me?.farm,m=mkMap('fmap',{center:f?[f.lon,f.lat]:[0,20],zoom:f?11:1.4});m.on('click',e=>setLoc(e.lngLat.lat,e.lngLat.lng,''));if(f){S.mk=new maplibregl.Marker({color:'#1F4D36'}).setLngLat([f.lon,f.lat]).addTo(m)}}
- if(S.scr=='app'&&S.tab=='earth'){const fs=S.me.fields,c=S.cam;mkMap('earth',{center:c?c.center:fs[0]?[fs[0].lon,fs[0].lat]:[0,20],zoom:c?c.zoom:fs[0]?14:1.5,pitch:c?c.pitch:fs[0]?50:0,onload:m=>{addFields(m,fs,(id,point)=>{const f=fs.find(x=>x.id==id);if(!f)return;loadMapPoint(f.id,point.lat,point.lng)});setLayer(S.layer,$('#ed').value);if(S.earthFocus){const chosen=fs.find(f=>f.id===S.earthFocus);if(chosen?.polygon?.length)fit(m,chosen.polygon);S.earthFocus=null}}});maps.earth.on('moveend',()=>{const m=maps.earth;if(m)S.cam={center:m.getCenter().toArray(),zoom:m.getZoom(),pitch:m.getPitch()}});maps.earth.on('error',e=>{if(e.sourceId=='gibs')$('#einfo')&&0})}
+ if(S.scr=='app'&&S.tab=='earth'){const fs=S.me.fields,c=S.cam;mkMap('earth',{center:c?c.center:fs[0]?[fs[0].lon,fs[0].lat]:[0,20],zoom:c?c.zoom:fs[0]?14:1.5,pitch:c?c.pitch:fs[0]?50:0,onload:m=>{addFields(m,fs,(id,point)=>{const f=fs.find(x=>x.id==id);if(!f)return;loadMapPoint(f.id,point.lat,point.lng)});setLayer(S.layer,$('#ed').value);if(S.earthFocus){const chosen=fs.find(f=>f.id===S.earthFocus);if(chosen?.polygon?.length)fit(m,chosen.polygon);S.earthFocus=null}}});maps.earth.on('moveend',()=>{const m=maps.earth;if(m){S.cam={center:m.getCenter().toArray(),zoom:m.getZoom(),pitch:m.getPitch()};updatePlanetHud()}});maps.earth.on('load',updatePlanetHud);maps.earth.on('error',e=>{if(e.sourceId=='gibs')$('#einfo')&&0})}
  if(S.scr=='app'&&S.tab=='rot')loadRot();if(S.scr=='app'&&['disc','match'].includes(S.tab))bindSwipe();if(S.scr=='app'&&S.tab=='co')0}
 /* ---------- overlays ---------- */
 function ovOpen(h){closeOv();$('#app').insertAdjacentHTML('beforeend',`<div class="over" id="ov"><div class="row" style="margin-bottom:8px"><button class="ic" onclick="closeOv()">${ic('back')}</button></div>${h}</div>`);S.ov=1}

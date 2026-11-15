@@ -31,6 +31,8 @@ const earth=el('#main').innerHTML;
 assert(earth.includes('earth-workspace-grid'),'Missing Earth split-view');
 assert(earth.includes('id="esel"'),'Missing point inspector');
 assert(earth.includes('focusEarthField(1)'),'Missing field jump');
+for(const control of ['planetSpin','planetTerrain','planetHud','planetFullscreen','planetFly(76.945,43.239,10,55)'])assert(earth.includes(control),'Missing globe interaction '+control);
+assert(fs.readFileSync(path.join(root,'studio.css'),'utf8').includes('.planet-command'),'Missing globe styling');
 vm.runInContext("S.tab='fields';S.fieldQuery='zz_missing';draw()",context);
 assert(el('#main').innerHTML.includes('fields-empty'),'Field search lacks empty state');
 vm.runInContext("S.fieldQuery='North';draw()",context);

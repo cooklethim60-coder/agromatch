@@ -407,3 +407,35 @@ button{font-family:inherit}
 .command-feed-avatar{height:32px;width:32px;flex:0 0 32px;display:grid;place-items:center;border-radius:10px;background:var(--sage2);color:var(--pri);font-size:14px;font-weight:800}
 .command-feed-item b{font-size:11px}
 .command-feed-item p{font-size:11px;color:var(--mut);line-height:1.55;margin:2px 0 0;overflow-wrap:anywhere}
+
+
+/* Planet Command / cinematic cartography, accessible controls and compact HUD */
+.earth-studio{position:relative}
+.earth-studio:before{content:"";position:absolute;inset:-18px -18px auto;height:360px;pointer-events:none;background:radial-gradient(ellipse at 58% 0%,rgba(74,183,139,.10),transparent 70%);z-index:0}
+.earth-studio>*{position:relative}
+.earth-map-wrap.planet-command{position:relative;isolation:isolate;overflow:hidden;border:1px solid rgba(145,218,179,.24);border-radius:22px;background:#06171c;box-shadow:0 22px 62px rgba(7,32,30,.24),inset 0 0 0 1px rgba(255,255,255,.06)}
+.planet-command .map.big{margin:0;border-radius:0;min-height:490px;height:min(66vh,780px);background:radial-gradient(circle at 45% 45%,#174957,#071721 75%)}
+.planet-command .maplibregl-canvas{filter:saturate(1.15) contrast(1.055)}
+.planet-command:after{content:"";pointer-events:none;position:absolute;inset:0;z-index:2;background:linear-gradient(180deg,rgba(4,17,23,.67),transparent 24%,transparent 70%,rgba(4,17,23,.55));box-shadow:inset 0 0 90px rgba(0,9,18,.28)}
+.planet-top-overlay,.planet-quick-locations,.planet-map-actions,.planet-hud{position:absolute;z-index:5;display:flex;align-items:center}
+.planet-top-overlay{top:18px;left:18px;right:18px;justify-content:space-between;gap:8px;pointer-events:none}
+.planet-live,.planet-satellite{color:#e7fff2;font-size:10px;font-weight:850;letter-spacing:.15em;text-shadow:0 2px 8px #0008}
+.planet-live{display:flex;align-items:center;gap:9px;padding:10px 13px;border:1px solid #ffffff35;border-radius:100px;background:#061b20b8;backdrop-filter:blur(15px)}
+.planet-live i,.planet-hud-pulse{width:7px;height:7px;border-radius:50%;background:#9bf9ac;box-shadow:0 0 0 4px #a4f4a522,0 0 12px #83ff9a;display:inline-block}
+.planet-satellite{color:#d2e8e1;letter-spacing:.1em}
+.planet-quick-locations{top:69px;left:18px;gap:6px;flex-wrap:wrap;max-width:calc(100% - 36px)}
+.planet-map-actions{bottom:54px;left:18px;gap:7px;flex-wrap:wrap;max-width:calc(100% - 36px)}
+.planet-command button{font-family:inherit}
+.planet-quick-locations button,.planet-map-actions button{border:1px solid #ffffff36;border-radius:10px;background:#061a21c9;color:#e8f9f1;min-height:34px;padding:8px 12px;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:750;cursor:pointer;backdrop-filter:blur(14px);transition:background .2s,transform .2s,border-color .2s}
+.planet-quick-locations button:hover,.planet-map-actions button:hover,.planet-map-actions button[aria-pressed=true]{background:#1b6556e8;border-color:#a3ebbf99;transform:translateY(-1px)}
+.planet-command button:focus-visible{outline:3px solid #b8f6be!important;outline-offset:2px}
+.planet-hud{bottom:16px;left:18px;gap:10px;background:#061a21ad;border:1px solid #ffffff24;padding:7px 11px;border-radius:9px;color:#d8f5e5;font:700 10px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.06em;backdrop-filter:blur(12px);pointer-events:none}
+.planet-command .maplibregl-ctrl-top-right{top:125px;right:8px}
+.planet-command .maplibregl-ctrl-group{background:#09202bd9;border:1px solid #ffffff33;box-shadow:0 6px 18px #0004}
+.planet-command .maplibregl-ctrl-group button{filter:invert(1);opacity:.88}
+.planet-command .maplibregl-ctrl-attrib{background:#05151ccc!important;color:#c7d7d0!important}
+.planet-command .maplibregl-ctrl-attrib a{color:#b9e9c9!important}
+.planet-command:fullscreen{border-radius:0;width:100vw;height:100vh}
+.planet-command:fullscreen .map.big{height:100vh!important;min-height:100vh}
+@media(max-width:760px){.planet-command .map.big{height:58vh;min-height:420px}.planet-satellite{display:none}.planet-quick-locations{top:65px}.planet-quick-locations button{padding:7px 9px;font-size:10px}.planet-map-actions{bottom:53px}.planet-map-actions button{font-size:10px;padding:7px 9px}.planet-command .maplibregl-ctrl-top-right{top:116px}.earth-map-wrap.planet-command{border-radius:17px}}
+@media(prefers-reduced-motion:reduce){.planet-quick-locations button,.planet-map-actions button{transition:none}}
