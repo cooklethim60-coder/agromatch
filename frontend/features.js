@@ -36,7 +36,68 @@ function shellNav(){
 function openMore(){ovOpen(`<h1>Explore AgroMatch</h1><p class="mut">Choose a workspace</p><div class="extra-menu">${NAV.map(x=>`<button onclick="closeOv();tab('${x.id}')">${ic(x.ico)}<span>${navLabel(x)}</span></button>`).join('')}</div><button class="btn o s language-mobile" onclick="toggleUiLanguage()">🌐 ${uiLanguage()==='ru'?'English':'Русский'}</button>`)}
 function selFieldHtml(action){return `<label>Selected field</label><select onchange="S.extraField=+this.value;${action}()">${S.me.fields.map(f=>`<option value="${f.id}" ${f.id===S.extraField?'selected':''}>${esc(f.name)} · ${f.area_ha} ha</option>`).join('')}</select>`}
 function ensureField(){if(!S.extraField||!S.me.fields.some(f=>f.id===S.extraField))S.extraField=S.me.fields[0]?.id||null;return S.extraField}
-function myFields(){return hdr('My Fields','Boundaries · soils · crop histories · satellites')+`<div class="section-eyebrow">MANAGED LAND · ${S.me.fields.length} FIELDS</div><div class="feature-grid">${S.me.fields.map(f=>{const s=f.snapshots[0],m=s?.metrics;return `<div class="field-tile"><div class="row sb"><div><div class="section-eyebrow">FIELD ${f.id}</div><h2>${esc(f.name)}</h2></div>${s?lvpill(s.level,s.harmony):''}</div><div class="mut">${f.area_ha} hectares · ${esc(f.soil||'Soil not recorded')}</div><div class="key-stats"><span>Rain / year <b>${m?.rain_mm??'—'} mm</b></span><span>Temperature <b>${m?.temp_c??'—'}°C</b></span></div><div class="mut source-line">${m?.simulated?tag('s'):tag('n')} ${m?.last_obs||'No observation date'}</div><div class="row tile-actions"><button class="btn s" onclick="ovField(${f.id})">Explore field</button><button class="btn o s" onclick="S.extraField=${f.id};tab('doctor')">Diagnosis</button></div></div>`}).join('')}</div><button class="btn o" onclick="S.scr='fieldEd';S.edit=null;S.pts=[];draw()">+ Draw a new field</button>`}
+
+function fieldsFiltered(){
+ let fields=[...(S.me?.fields||[])],query=String(S.fieldQuery||'').trim().toLowerCase();
+ if(query)fields=fields.filter(f=>(f.name+' '+(f.soil||'')+' '+(f.crops||[]).join(' ')).toLowerCase().includes(query));
+ switch(S.fieldSort){
+  case 'area-desc':fields.sort((a,b)=>(Number(b.area_ha)||0)-(Number(a.area_ha)||0));break;
+  case 'area-asc':fields.sort((a,b)=>(Number(a.area_ha)||0)-(Number(b.area_ha)||0));break;
+  default:fields.sort((a,b)=>String(a.name).localeCompare(String(b.name)));break;
+ }
+ return fields;
+}
+function fieldsListMarkup(){
+ const ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b,filtered=fieldsFiltered();
+ if(!filtered.length)return `<div class="fields-empty"><span aria-hidden="true">⌕</span><h3>${t('Поля не найдены','No matching fields')}</h3><p class="mut">${t('Попробуйте изменить запрос или сбросить поиск.','Try a different search or clear the filter.')}</p><button class="btn o s" onclick="S.fieldQuery='';const x=$('#fieldSearch');if(x)x.value='';renderFieldsList()">${t('Сбросить','Clear search')}</button></div>`;
+ return filtered.map(f=>{
+  const s=f.snapshots?.[0],m=s?.metrics||{};
+  return `<article class="field-tile field-management-card">
+   <div class="field-management-header"><span class="field-management-id">FIELD ${f.id}</span>${m.simulated?tag('s'):m.source?tag('n'):'<span class="mini-source">NO DATA</span>'}</div>
+   <h2>${esc(f.name)}</h2><p class="mut">${esc(f.soil||t('Почва не указана','Soil not specified'))} · ${Number(f.area_ha||0).toLocaleString(ru?'ru-RU':'en-US')} ha</p>
+   <div class="field-management-kpis"><div><small>${t('Осадки / период','Rain / period')}</small><strong>${m.rain_mm==null?'—':esc(m.rain_mm)+' mm'}</strong></div><div><small>${t('Средняя температура','Mean temperature')}</small><strong>${m.temp_c==null?'—':esc(m.temp_c)+' °C'}</strong></div></div>
+   <div class="field-management-footer"><button class="btn s" onclick="ovField(${f.id})">${t('Подробности','Details')} ↗</button><button class="btn o s" onclick="focusEarthField(${f.id})">${t('На карте','Map')} ⌖</button><button class="btn o s" onclick="S.extraField=${f.id};tab('doctor')">${t('Анализ','Analysis')}</button></div>
+  </article>`;
+ }).join('');
+}
+function renderFieldsList(){
+ const e=$('#fieldsResults');if(e)e.innerHTML=fieldsListMarkup();
+ const count=$('#fieldsVisibleCount');if(count)count.textContent=fieldsFiltered().length;
+}
+function fieldsComparisonHTML(){
+ const fields=S.me?.fields||[],ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b;
+ if(fields.length<2)return `<p class="mut">${t('Добавьте второе поле, чтобы сравнить показатели.','Add a second field to compare indicators.')}</p>`;
+ const ids=fields.map(x=>x.id);if(!ids.includes(S.compareA))S.compareA=ids[0];
+ if(!ids.includes(S.compareB)||S.compareB===S.compareA)S.compareB=ids.find(x=>x!==S.compareA)||ids[1];
+ const a=fields.find(x=>x.id===S.compareA),b=fields.find(x=>x.id===S.compareB);
+ const opts=which=>fields.map(f=>`<option value="${f.id}" ${f.id===which?'selected':''}>${esc(f.name)}</option>`).join('');
+ const val=(m,k,unit='')=>m?.[k]==null?'—':esc(m[k])+unit;
+ const rows=[
+  [t('Площадь','Area'),(f,m)=>Number(f.area_ha||0).toLocaleString(ru?'ru-RU':'en-US')+' ha'],
+  [t('Осадки / период','Period rainfall'),(f,m)=>val(m,'rain_mm',' mm')],
+  [t('Средняя температура','Mean temperature'),(f,m)=>val(m,'temp_c',' °C')],
+  [t('Модельная влажность (0–1)','Modeled wetness (0–1)'),(f,m)=>val(m,'wetness')],
+  [t('Тип почвы','Soil type'),f=>esc(f.soil||'—')],
+  [t('Последние данные','Last available data'),(f,m)=>esc(m?.last_obs||'—')]
+ ];
+ const ma=a.snapshots?.[0]?.metrics,mb=b.snapshots?.[0]?.metrics;
+ const source=m=>m?.simulated?tag('s'):m?.source?tag('n'):'<span class="source-unknown">NO DATA</span>';
+ return `<div class="field-compare-inputs"><label>${t('Поле A','Field A')}<select aria-label="${t('Первое поле','First field')}" onchange="S.compareA=+this.value;renderFieldComparison()">${opts(a.id)}</select></label><label>${t('Поле B','Field B')}<select aria-label="${t('Второе поле','Second field')}" onchange="S.compareB=+this.value;renderFieldComparison()">${opts(b.id)}</select></label></div>
+ <div class="field-compare-scroll"><table class="field-compare-table"><thead><tr><th>${t('Показатель','Indicator')}</th><th>${esc(a.name)}<div>${source(ma)}</div></th><th>${esc(b.name)}<div>${source(mb)}</div></th></tr></thead><tbody>${rows.map(([name,calc])=>`<tr><th>${name}</th><td>${calc(a,ma)}</td><td>${calc(b,mb)}</td></tr>`).join('')}</tbody></table></div>
+ <p class="footnote">${t('Это сравнение не является оценкой урожайности. Периоды данных могут различаться; NASA POWER отражает региональную сетку, а SIMULATED — демонстрационные значения.','Not a yield forecast. Observation periods may differ; NASA POWER is regional grid data and SIMULATED values are demonstrations.')}</p>`;
+}
+function renderFieldComparison(){const e=$('#fieldComparisonResults');if(e)e.innerHTML=fieldsComparisonHTML()}
+function myFields(){
+ const ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b,fields=S.me.fields||[];
+ return hdr(t('Мои поля','My fields'),t('Контуры, климат, культура и история участков','Boundaries, climate, crops and field histories'))+
+ `<div class="fields-management">
+ <div class="fields-management-hero"><div><div class="section-eyebrow">${t('ЗЕМЕЛЬНЫЙ БАНК','FIELD PORTFOLIO')}</div><h2>${fields.length} ${t('полей в хозяйстве','fields in your portfolio')}</h2><p>${t('Найдите нужный участок или перейдите к его координатам на карте.','Find any parcel, explore its history or jump to its map location.')}</p></div><div class="fields-management-actions"><button class="btn s" onclick="S.scr='fieldEd';S.edit=null;S.pts=[];draw()">+ ${t('Новое поле','Add field')}</button><button class="btn o s" onclick="downloadFieldsGeoJSON()">↓ GeoJSON</button></div></div>
+ <div class="fields-management-toolbar"><label for="fieldSearch">${t('Поиск по названию, почве, культуре','Search fields by name, soil or crop')}<input id="fieldSearch" type="search" placeholder="${t('Например: пшеница','e.g. wheat')}" value="${esc(S.fieldQuery||'')}" oninput="S.fieldQuery=this.value;renderFieldsList()"></label><label for="fieldSort">${t('Сортировка','Sort fields')}<select id="fieldSort" onchange="S.fieldSort=this.value;renderFieldsList()"><option value="name" ${S.fieldSort==='name'||!S.fieldSort?'selected':''}>${t('По названию','Name')}</option><option value="area-desc" ${S.fieldSort==='area-desc'?'selected':''}>${t('Площадь ↓','Area ↓')}</option><option value="area-asc" ${S.fieldSort==='area-asc'?'selected':''}>${t('Площадь ↑','Area ↑')}</option></select></label><span class="fields-result-count"><b id="fieldsVisibleCount">${fieldsFiltered().length}</b> / ${fields.length}</span></div>
+ <details class="field-comparison"><summary><span>◫</span> ${t('Сравнить два поля','Compare two fields')} <small>${t('Региональные условия и история','Regional conditions and history')}</small></summary><div id="fieldComparisonResults">${fieldsComparisonHTML()}</div></details>
+ <div class="fields-result-grid" id="fieldsResults">${fieldsListMarkup()}</div>
+ <p class="footnote">${t('Климатические показатели NASA POWER имеют региональное разрешение. Данные с пометкой SIMULATED не являются наблюдениями.','NASA POWER climate estimates are regional; SIMULATED values are not observations.')}</p>
+ </div>`;
+}
 function doctorPage(){ensureField();return hdr('Field Doctor','Evidence first · transparent diagnostics')+`<div class="feature-panel">${selFieldHtml('loadDoctor')}<div id="doctorResults" class="loading-region">Checking available observations…</div></div><div class="footnote">Not a medical-style diagnosis for crops. Rule-based indicators highlight potential problems; confirm them with field inspections.</div>`}
 async function loadDoctor(){if(!$('#doctorResults'))return;$('#doctorResults').innerHTML='<p class="mut">Analysing available data…</p>';await tryit(async()=>{const r=await api(`/fields/${S.extraField}/doctor`);if(!$('#doctorResults'))return;$('#doctorResults').innerHTML=`<div class="row sb"><h2>Field observations</h2><span class="tag f_">RULE-BASED</span></div>${r.findings.map(v=>`<div class="finding ${v.level}"><div class="row sb"><b>${esc(v.title)}</b><span class="mini-source">${esc(v.source)}</span></div><p><b>Evidence:</b> ${esc(v.evidence)}</p><p>${esc(v.interpretation)}</p><div class="recommend"><b>Recommended check:</b> ${esc(v.action)}</div></div>`).join('')}<p class="mut">${esc(r.limitations)}</p><div class="row"><button class="btn s" onclick="loadAiDoctor()">Generate AI interpretation</button><button class="btn o s" onclick="S.cop.field=S.extraField;S.cop.mode='do';tab('co')">Farm Copilot</button></div><div id="aiDoctorResult"></div>`})}
 async function loadAiDoctor(){const el=$('#aiDoctorResult');if(!el)return;el.innerHTML='<p class="mut">Asking the configured AI provider…</p>';
@@ -130,14 +191,29 @@ function loadSymphonyContext(){const f=S.me.fields.find(x=>x.id===S.extraField),
 
 function matchPage(){return hdr('Farm Match','Discover growers with related conditions')+`<div class="row" style="margin-bottom:12px"><button class="chip" onclick="tab('chat')">My conversations (${S.matches.length})</button><button class="chip" onclick="S.disc=[];load().then(draw)">Refresh discovery</button></div>`+swipeV()}
 function chatPage(){return hdr('Farm Chat','Private conversations with mutual matches')+`<div class="feature-panel"><b>Your connections</b><div class="mut">Only farmers who liked each other can start a conversation.</div></div>`+msgV()}
-function satellitePanel(){ensureField();return `<div class="feature-panel satellite-lab"><div class="row sb"><div><div class="section-eyebrow">NASA APPEEARS · POINT EXTRACTION</div><h2>Measured satellite indicators</h2></div><span class="tag n">NASA</span></div>${selFieldHtml('loadEarthIntelligence();loadSatellite')}<div id="earthIntelligenceResults" class="loading-region">Checking NASA climate records…</div><div id="satelliteResults" class="loading-region">Checking observation availability…</div></div>`}
-async function loadSatellite(){const el=$('#satelliteResults');if(!el)return;el.innerHTML='<p class="mut">Checking observation availability…</p>';try{const r=await api(`/fields/${S.extraField}/satellite`);if(!$('#satelliteResults'))return;const obs=r.observations||[],ndvi=obs.filter(o=>o.indicator==='NDVI').sort((a,b)=>a.observed_at.localeCompare(b.observed_at));el.innerHTML=`<div class="row sb"><b>${obs.length} extracted data points</b><button class="btn s" onclick="submitSatellite()">Request NASA data</button></div><div class="row" style="margin-top:8px"><select id="nasaProduct" onchange="loadNasaLayers()"><option value="">MODIS NDVI (default)</option><option value="SPL4SMGP.007">SMAP root-zone moisture (catalog check)</option><option value="ECO_L2T_LSTE.002">ECOSTRESS temperature (catalog check)</option></select><select id="nasaLayer"><option value="">Select a verified NASA layer</option></select></div><div id="nasaCatalogInfo" class="mut">Optional: choose an additional verified NASA collection and layer before requesting extraction.</div><div class="footnote">${esc(r.limitations)} NASA Earthdata login and product access required.</div>${r.tasks.map(t=>`<div class="sat-task"><div class="row sb"><b>${esc(t.status)}</b><button class="btn o s" onclick="refreshSatellite(${t.id})">Check status</button></div><div class="mut">Task ${esc(t.remote_id)} · ${new Date(t.created*1000).toLocaleDateString()}</div>${t.error?`<div class="warn">Previous check failed: ${esc(t.error)}</div>`:''}</div>`).join('')}${obs.length?`<h3>Observed series</h3>${ndvi.length>=2?`<p class="mut">MODIS NDVI point trend (${ndvi.length} dates; QA not independently validated)</p>${line(ndvi.map(n=>n.value),ndvi.map(n=>n.observed_at.slice(5)))}`:''}${obs.slice(0,18).map(o=>`<div class="obs-row"><span>${esc(o.observed_at)} · ${esc(o.indicator)}</span><b>${o.value}</b><small>${esc(o.product)}</small></div>`).join('')}<p class="mut">Raw units and quality checks require scientific validation before comparisons.</p>`:'<p class="mut">No extracted numeric NASA observations. Map layers are visual imagery, not numerical measurements.</p>'}`;
-}catch(e){el.innerHTML=`<div class="warn">${esc(e.message)}</div>`}}
+function satellitePanel(){ensureField();return `<div class="feature-panel satellite-lab"><div class="row sb"><div><div class="section-eyebrow">NASA APPEEARS · POINT EXTRACTION</div><h2>Satellite point extractions</h2></div><span class="tag n">NASA DATA</span></div><p class="mut">Product availability and raw units need validation; these are not automatically field-average measurements.</p>${selFieldHtml('loadEarthIntelligence();loadSatellite')}<div id="earthIntelligenceResults" class="loading-region">Checking NASA climate records…</div><div id="satelliteResults" class="loading-region">Checking observation availability…</div></div>`}
+async function loadSatellite(){const el=$('#satelliteResults');if(!el)return;const fieldId=S.extraField;el.innerHTML='<p class="mut">Checking observation availability…</p>';try{const r=await api(`/fields/${fieldId}/satellite`);if(S.extraField!==fieldId||!$('#satelliteResults'))return;const obs=r.observations||[],ndvi=obs.filter(o=>o.indicator==='NDVI').sort((a,b)=>a.observed_at.localeCompare(b.observed_at));el.innerHTML=`<div class="row sb"><b>${obs.length} extracted data points</b><button class="btn s" onclick="submitSatellite()">Request NASA data</button></div><div class="row" style="margin-top:8px"><select id="nasaProduct" onchange="loadNasaLayers()"><option value="">MODIS NDVI (default)</option><option value="SPL4SMGP.007">SMAP root-zone moisture (catalog check)</option><option value="ECO_L2T_LSTE.002">ECOSTRESS temperature (catalog check)</option></select><select id="nasaLayer"><option value="">Select a verified NASA layer</option></select></div><div id="nasaCatalogInfo" class="mut">Optional: choose an additional verified NASA collection and layer before requesting extraction.</div><div class="footnote">${esc(r.limitations)} NASA Earthdata login and product access required.</div>${r.tasks.map(t=>`<div class="sat-task"><div class="row sb"><b>${esc(t.status)}</b><button class="btn o s" onclick="refreshSatellite(${t.id})">Check status</button></div><div class="mut">Task ${esc(t.remote_id)} · ${new Date(t.created*1000).toLocaleDateString()}</div>${t.error?`<div class="warn">Previous check failed: ${esc(t.error)}</div>`:''}</div>`).join('')}${obs.length?`<h3>Observed series</h3>${ndvi.length>=2?`<p class="mut">MODIS NDVI point trend (${ndvi.length} dates; QA not independently validated)</p>${line(ndvi.map(n=>n.value),ndvi.map(n=>n.observed_at.slice(5)))}`:''}${obs.slice(0,18).map(o=>`<div class="obs-row"><span>${esc(o.observed_at)} · ${esc(o.indicator)}</span><b>${o.value}</b><small>${esc(o.product)}</small></div>`).join('')}<p class="mut">Raw units and quality checks require scientific validation before comparisons.</p>`:'<p class="mut">No extracted numeric NASA observations. Map layers are visual imagery, not numerical measurements.</p>'}`;
+}catch(e){if(S.extraField===fieldId&&$('#satelliteResults'))el.innerHTML=`<div class="warn">${esc(e.message)}</div>`}}
 async function submitSatellite(){await tryit(async()=>{const product=$('#nasaProduct')?.value,layer=$('#nasaLayer')?.value;if(product&&!layer)throw new Error('Select a verified layer first');const x=await api(`/fields/${S.extraField}/satellite/tasks`,{b:product?{product,layer}:{}});toast('NASA extraction task submitted');await loadSatellite()})}
 async function refreshSatellite(id){await tryit(async()=>{const x=await api(`/fields/${S.extraField}/satellite/tasks/${id}/refresh`,{b:{}});toast('NASA task: '+x.status);await loadSatellite()})}
-async function loadHomePreview(){const fid=S.me.fields[0]?.id;if(!fid)return;
- try{const w=await api(`/fields/${fid}/weather`);if($('#homeForecast'))$('#homeForecast').innerHTML=`<div class="key-stats"><span>High today <b>${weatherNum(w.days[0]?.high,0,' °C')}</b></span><span>7-day rain <b>${(w.days.every(d=>d.rain!=null)?weatherNum(w.days.reduce((a,b)=>a+Number(b.rain),0),1,' мм'):'—')}</b></span></div>${w.warnings.length?`<p class="mut">${esc(w.warnings[0].text)}</p>`:'<p class="mut">No weather thresholds exceeded.</p>'}`;}catch(e){if($('#homeForecast'))$('#homeForecast').textContent='Forecast unavailable. Historical NASA data remains available.'}
- try{const feed=await api('/feed?limit=3');if($('#homeFeed'))$('#homeFeed').innerHTML=feed.length?feed.map(p=>`<p class="mut"><b>${esc(p.author)}</b>: ${esc(p.body.slice(0,100))}</p>`).join(''):'<p class="mut">No community posts yet.</p>';}catch(e){if($('#homeFeed'))$('#homeFeed').textContent='Community unavailable.'}
+async function loadHomePreview(){
+ const fid=S.me.fields[0]?.id;if(!fid)return;
+ const ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b;
+ try{
+  const w=await api(`/fields/${fid}/weather`),days=w.days||[],today=days[0]||{};
+  if($('#homeForecast')){
+   const rain=days.length&&days.every(d=>d.rain!=null)?weatherNum(days.reduce((a,d)=>a+Number(d.rain),0),1,' mm'):'—';
+   const outlook=w.warnings?.length?t('Проверьте погодные риски в полном прогнозе.','Review weather risks in the full forecast.'):t('Пороговые предупреждения не обнаружены.','No threshold alerts reported.');
+   $('#homeForecast').innerHTML=`<div class="home-weather-summary"><div class="home-weather-current"><span class="weather-symbol">${weatherIcon(today.code)}</span><strong>${weatherNum(today.high,0,' °C')}</strong><small>${t('Дневной максимум','Daytime high')}</small></div><div class="home-weather-metrics"><span>${t('Осадки за 7 дней','7-day rainfall')}<b>${rain}</b></span><span>${t('Мин. сегодня','Low today')}<b>${weatherNum(today.low,0,' °C')}</b></span></div></div><p class="home-weather-note">${outlook}</p><p class="home-weather-source">OPEN-METEO · ${t('Прогноз модели','Model forecast')} · ${esc(w.timezone||'UTC')}</p>`;
+  }
+ }catch(e){if($('#homeForecast'))$('#homeForecast').innerHTML='<p class="mut">'+t('Прогноз временно недоступен. Попробуйте позже.','Forecast currently unavailable. Try again later.')+'</p>'}
+ try{
+  const feed=await api('/feed?limit=3');
+  if($('#homeFeed'))$('#homeFeed').innerHTML=feed.length?feed.map(p=>{
+   const author=String(p.author||t('Фермер','Farmer'));
+   return `<div class="command-feed-item"><span class="command-feed-avatar">${esc(author[0]?.toUpperCase()||'F')}</span><div><b>${esc(author)}</b><p>${esc(String(p.body||'').slice(0,110))}</p></div></div>`;
+  }).join(''):'<p class="mut">'+t('Публикаций пока нет. Начните обсуждение в сообществе.','No updates yet. Start a conversation in the community.')+'</p>';
+ }catch(e){if($('#homeFeed'))$('#homeFeed').textContent=t('Сообщество временно недоступно.','Community currently unavailable.')}
 }
 function extraAfter(){if(S.scr!=='app')return;({home:loadHomePreview,doctor:loadDoctor,weather:loadWeather,feed:loadFeed,knowledge:loadKnowledge,earth:()=>{loadSatellite();loadEarthIntelligence()},music:loadSymphonyContext})[S.tab]?.()}
 
@@ -145,17 +221,18 @@ function extraAfter(){if(S.scr!=='app')return;({home:loadHomePreview,doctor:load
 /* Numerically validated NASA POWER series + optional SRTM point elevation. */
 async function loadEarthIntelligence(elevation=false,refresh=false){
  const el=$('#earthIntelligenceResults');if(!el)return;
+ const fieldId=S.extraField;
  el.innerHTML='<p class="mut">Requesting NASA POWER daily data…</p>';
  try{
-  const r=await api(`/fields/${S.extraField}/earth-intelligence?days=365&elevation=${elevation}&refresh=${refresh}`);
-  if(!$('#earthIntelligenceResults'))return;
+  const r=await api(`/fields/${fieldId}/earth-intelligence?days=365&elevation=${elevation}&refresh=${refresh}`);
+  if(S.extraField!==fieldId||!$('#earthIntelligenceResults'))return;
   const p=r.data?.POWER,inds=p?.indicators||{},e=r.data?.SRTM;
   el.innerHTML=`<div class="row sb"><b>NASA Earth Intelligence</b><div class="row"><button class="btn o s" onclick="loadEarthIntelligence(true,true)">+ SRTM elevation</button><button class="btn o s" onclick="loadEarthIntelligence(false,true)">Refresh</button></div></div>`+
   (p?`<div class="mut">NASA POWER · UTC daily · ${esc(p.period.first_observation)}–${esc(p.period.last_observation)} · ${p.period.valid_days} valid days</div><div class="key-stats"><span>Period rain <b>${inds.rain_total_mm} mm</b></span><span>Mean temperature <b>${inds.mean_temp_c}°C</b></span><span>Dry days (&lt;1 mm) <b>${inds.dry_days_under_1mm}</b></span><span>Heavy rain days (≥20 mm) <b>${inds.heavy_rain_days_20mm}</b></span><span>Frost days <b>${inds.frost_days_min_le_0c??'n/a'}</b></span><span>Heat days <b>${inds.heat_days_max_ge_35c??'n/a'}</b></span></div>${p.monthly.length>1?`<b>Monthly rainfall, mm</b>${bars(p.monthly.map(x=>x.rain_mm),p.monthly.map(x=>x.month.slice(5)))}`:''}<p class="footnote">${p.limitations.map(esc).join(' · ')}</p>`:'<div class="warn">NASA POWER unavailable. No synthetic data used for this panel.</div>')+
   (e?`<p class="mut">SRTM point elevation: <b>${e.elevation_m} m</b> · third-party OpenTopoData mirror · ~90 m resolution. Not a field slope measurement.</p>`:'')+
   Object.entries(r.unavailable||{}).map(([k,v])=>`<p class="warn">${esc(k)}: ${esc(v)}</p>`).join('')+
   `<details><summary>Dataset availability and limitations</summary>${Object.entries(r.catalog).map(([k,v])=>`<p class="mut"><b>${esc(k)}</b>: ${esc(v)}</p>`).join('')}</details><div class="row"><button class="btn o s" onclick="refreshClimateSnapshot()">Update rotation baseline from NASA POWER</button></div>`;
- }catch(e){if($('#earthIntelligenceResults'))$('#earthIntelligenceResults').innerHTML=`<div class="warn">NASA request failed: ${esc(e.message)}. Existing data has not been changed.</div>`}
+ }catch(e){if(S.extraField===fieldId&&$('#earthIntelligenceResults'))$('#earthIntelligenceResults').innerHTML=`<div class="warn">NASA request failed: ${esc(e.message)}. Existing data has not been changed.</div>`}
 }
 async function refreshClimateSnapshot(){await tryit(async()=>{const f=S.extraField;const r=await api(`/fields/${f}/refresh-climate`,{b:{}});await load();toast(r.snapshot?.metrics?.simulated?'POWER unavailable — baseline is SIMULATED':'NASA POWER climate baseline updated');await loadEarthIntelligence();})}
 

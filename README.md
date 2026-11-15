@@ -1,3 +1,5 @@
+> **AgroMatch Studio design update:** a responsive, map-first Command Center, improved Earth Studio, searchable field portfolio, side-by-side comparisons and premium first-run screens. [Design notes and QA guide](STUDIO_DESIGN.md). Full satellite scientific validation and persistent database hosting are still separate work.
+
 > **AgroMatch v3 (Kazakhstan + global):** improved field geometry, source-labelled map point conditions, reliable weather refresh, RU/EN navigation, and regression tests. [Implementation roadmap](AGROMATCH_ROADMAP.md). Render Free still uses *temporary SQLite storage*; do not treat it as a persistent farm database.
 
 > **New:** NASA daily numeric indicators, validated AppEEARS source selection and optional SRTM mirror elevation. See [NASA_INTEGRATION.md](NASA_INTEGRATION.md) for supported sources and limitations.

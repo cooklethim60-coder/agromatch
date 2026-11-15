@@ -6,16 +6,18 @@ Upload the **contents** of the `agromatch` folder to the root of your GitHub rep
 ## Render
 1. Dashboard → New → Blueprint.
 2. Connect the GitHub repository and select `render.yaml`.
-3. Approve the paid Starter web service and 1 GB persistent disk, or adapt the Blueprint to your needs.
+3. The current `render.yaml` deploys a **Free Docker web service** with **ephemeral SQLite storage**. It is appropriate only for a demo. For real farm accounts, first migrate to a durable external database; changing the Blueprint alone does not migrate SQLite data.
 4. Add optional environment secrets in the Render service dashboard (never in GitHub):
    - `EARTHDATA_USERNAME`, `EARTHDATA_PASSWORD`, `APPEEARS_TOKEN` as needed for AppEEARS.
    - `AI_PRIMARY_API_KEY` and/or `AI_BACKUP_API_KEY` for AI providers.
 5. Deploy, open the service URL, and visit `/health` to check basic availability.
 
-The database uses `/app/storage/agromatch.db`; a persistent disk is required for durable SQLite data. The app does not require a build-time Earthdata credential. NASA APIs must be reachable from the deployed service for live observations. A passing `/health` only proves the web server is running, not that NASA APIs are accessible.
+The demo database uses `/app/storage/agromatch.db` and **does not survive all Free instance restarts or redeploys**. Render Free has no persistent disk. Do not use the demo for real, irreplaceable farmer records. A durable database/storage migration is a separate production requirement. The app does not require a build-time Earthdata credential. NASA APIs must be reachable from the deployed service for live observations. A passing `/health` only proves the web server is running, not that NASA APIs are accessible.
 
 ### Manual Render Web Service
-Runtime: Docker; Dockerfile path: `./Dockerfile`; health check path: `/health`; disk mount: `/app/storage`; environment `DATABASE_PATH=/app/storage/agromatch.db`.
+Demo configuration: Runtime `Docker`, Dockerfile `./Dockerfile`, health check `/health`, `DATABASE_PATH=/app/storage/agromatch.db`, `DATA_PERSISTENCE_MODE=ephemeral`, **no disk on Free**. A disk mounted at `/app/storage` is only possible on plans supporting persistent disks. You must provision and verify durable storage separately before production.
+
+After a successful GitHub merge, inspect Render deployment logs for the new commit. A successful GitHub Actions run does not by itself prove that NASA or Gemini credentials work on Render.
 
 ### Security
 Do not commit `.env`, credentials, `.db`, WAV artifacts or private user data. Rotate any credentials previously included in a ZIP. Render Free has no persistent disks, so it is not suitable for persistent SQLite without external database migration.

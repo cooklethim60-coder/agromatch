@@ -31,8 +31,10 @@ ndvi:{n:'Vegetation',id:'MODIS_Terra_NDVI_8Day',lvl:9,ext:'png',src:'NASA MODIS 
 rain:{n:'Rainfall',id:'IMERG_Precipitation_Rate',lvl:6,ext:'png',src:'NASA GPM IMERG via GIBS',res:'≈10 km (0.1°)',unit:'mm/hr',freq:'30 minutes',lim:'Too coarse for single-field rainfall.'},
 temp:{n:'Temperature',id:'MODIS_Terra_Land_Surface_Temp_Day',lvl:7,ext:'png',src:'NASA MODIS Terra land surface temperature via GIBS',res:'1 km',unit:'K (surface, not air temp)',freq:'Daily, clear-sky only',lim:'Cloud gaps. ECOSTRESS (~70 m) needs NASA AppEEARS access—not enabled in this build.'},
 sm:{n:'Soil moisture',id:'SMAP_L4_Analyzed_Root_Zone_Soil_Moisture',lvl:6,ext:'png',src:'NASA SMAP L4 via GIBS',res:'≈9 km',unit:'m³/m³',freq:'3-hourly (model + SMAP)',lim:'Regional estimate only. Verify layer ID in GIBS GetCapabilities.'}};
-function setLayer(k,date){const m=maps.earth;if(!m||!window.maplibregl)return;S.layer=k;if(m.getLayer('gibs'))m.removeLayer('gibs');if(m.getSource('gibs'))m.removeSource('gibs');const L=LAY[k];if(L.id){m.addSource('gibs',{type:'raster',tiles:[`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${L.id}/default/${date}/GoogleMapsCompatible_Level${L.lvl}/{z}/{y}/{x}.${L.ext}`],tileSize:256,maxzoom:L.lvl,attribution:'NASA GIBS'});m.addLayer({id:'gibs',type:'raster',source:'gibs',paint:{'raster-opacity':.75}},m.getLayer('ffill')?'ffill':undefined)}
+function setLayer(k,date){const m=maps.earth;if(!m||!window.maplibregl)return;S.layer=k;if(m.getLayer('gibs'))m.removeLayer('gibs');if(m.getSource('gibs'))m.removeSource('gibs');const L=LAY[k];if(L.id){m.addSource('gibs',{type:'raster',tiles:[`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${L.id}/default/${date}/GoogleMapsCompatible_Level${L.lvl}/{z}/{y}/{x}.${L.ext}`],tileSize:256,maxzoom:L.lvl,attribution:'NASA GIBS'});m.addLayer({id:'gibs',type:'raster',source:'gibs',paint:{'raster-opacity':S.layerOpacity??.75}},m.getLayer('ffill')?'ffill':undefined)}
  document.querySelectorAll('#lays .chip').forEach(c=>c.classList.toggle('on',c.dataset.k==k));$('#einfo').innerHTML=`<b>${L.n}</b> ${L.id?tag('n'):''}<div class="mut">Source: ${L.src}<br>Date: ${L.id?date:'n/a'} · Resolution: ${L.res} · Units: ${L.unit} · Frequency: ${L.freq}</div><div class="warn">${L.lim} Missing tiles = no observation for that date.</div>`}
+function setLayerOpacity(pct){const value=Math.max(0,Math.min(100,Number(pct)||0));S.layerOpacity=value/100;const map=maps.earth;if(map&&window.maplibregl&&map.getLayer('gibs'))map.setPaintProperty('gibs','raster-opacity',S.layerOpacity);const label=$('#opacityValue');if(label)label.textContent=value+'%'}
+function shiftEarthDate(days){const input=$('#ed');if(!input?.value)return;const date=new Date(input.value+'T12:00:00Z');if(Number.isNaN(date.getTime()))return;date.setUTCDate(date.getUTCDate()+days);const max=new Date();if(date>max)date.setTime(max.getTime());input.value=date.toISOString().slice(0,10);setLayer(S.layer,input.value)}
 /* ---------- audio player ---------- */
 const P={a:new Audio(),ctx:null,an:null};P.a.crossOrigin='anonymous';
 function play(t){S.cur=t;P.a.src=t.url;P.ctx&&P.ctx.resume();P.a.play().catch(()=>{});$('#player').style.display='block';$('#pt').textContent=t.title+' · '+t.level;if(!P.ctx){P.ctx=new AudioContext();const s=P.ctx.createMediaElementSource(P.a);P.an=P.ctx.createAnalyser();P.an.fftSize=64;s.connect(P.an);P.an.connect(P.ctx.destination);viz()}}
@@ -44,14 +46,52 @@ const listen=(fid,sid)=>tryit(async()=>{toast('Composing… first time can take 
 let ws;function connect(){if(!T)return;ws=new WebSocket((location.protocol=='https:'?'wss://':'ws://')+location.host+'/ws?token='+T);ws.onmessage=async e=>{const d=JSON.parse(e.data);if(d.type=='match'){toast('New match!');refresh()}else if(d.message.sender_farm!=S.me.farm.id){if(S.thread==d.message.match_id){const l=await api(`/matches/${S.thread}/messages`);paintThread(l)}else{toast('New message');refresh()}}else if(S.thread==d.message.match_id){paintThread(await api(`/matches/${S.thread}/messages`))}};ws.onclose=()=>setTimeout(connect,3000)}
 async function refresh(){try{S.matches=await api('/matches');S.notif=S.matches.reduce((a,m)=>a+m.unread,0);S.notifN=(await api('/notifications')).filter(n=>!n.is_read).length;if(S.scr=='app'&&['disc','home','chat'].includes(S.tab)&&!S.ov&&!S.thread)draw()}catch(e){}}
 /* ---------- shell ---------- */
-function hdr(t,sub){return`<div class="row sb" style="margin-bottom:12px"><div><h1>${t}</h1><div class="mut">${sub||''}</div></div><div class="row"><button class="ic" onclick="ovNotif()" style="position:relative">${ic('bell')}${S.notifN?`<span class="dot" style="position:absolute;top:-2px;right:-2px">${S.notifN}</span>`:''}</button><button class="ic" onclick="ovSet()">${ic('gear')}</button></div></div>`}
-function draw(){$('#app').dataset.screen=S.scr;Object.keys(maps).forEach(k=>{if(k!='ovmap'){maps[k].remove();delete maps[k]}});const m=$('#main');document.querySelectorAll('nav').forEach(e=>e.remove());const F={onb,auth,farmSetup,fieldEd,boot:()=>'<p class="mut">Loading…</p>'}[S.scr];const views={home,earth,disc,rot,co,fields:myFields,doctor:doctorPage,weather:weatherPage,match:matchPage,chat:chatPage,feed:feedPage,music:farmSymphonyPage,knowledge:knowledgePage,reports:reportsPage};m.innerHTML=F?F():(views[S.tab]||home)();if(S.scr=='app'){$('#app').insertAdjacentHTML('beforeend',shellNav());after();extraAfter()}else{after()}}
-function tab(t){S.tab=t;draw()}
+function hdr(t,sub){return`<header class="app-topbar"><div class="topbar-title-wrap"><span class="topbar-eyebrow">AGROMATCH / EARTH INTELLIGENCE</span><h1>${t}</h1><div class="topbar-sub">${sub||''}</div></div><div class="topbar-actions"><button class="ic" onclick="ovNotif()" aria-label="Notifications" title="Notifications" style="position:relative">${ic('bell')}${S.notifN?`<span class="dot" style="position:absolute;top:-2px;right:-2px">${S.notifN}</span>`:''}</button><button class="ic" onclick="ovSet()" aria-label="Settings" title="Settings">${ic('gear')}</button></div></header>`}
+function draw(){document.documentElement.lang=uiLanguage();$('#app').dataset.screen=S.scr;Object.keys(maps).forEach(k=>{if(k!='ovmap'){maps[k].remove();delete maps[k]}});const m=$('#main');document.querySelectorAll('nav').forEach(e=>e.remove());const F={onb,auth,farmSetup,fieldEd,boot:()=>'<p class="mut">Loading…</p>'}[S.scr];const views={home,earth,disc,rot,co,fields:myFields,doctor:doctorPage,weather:weatherPage,match:matchPage,chat:chatPage,feed:feedPage,music:farmSymphonyPage,knowledge:knowledgePage,reports:reportsPage};m.innerHTML=F?F():(views[S.tab]||home)();if(S.scr=='app'){$('#app').insertAdjacentHTML('beforeend',shellNav());after();extraAfter()}else{after()}}
+function tab(t){S.tab=t;draw();const main=$('#main');if(main)main.scrollTop=0}
 async function boot(){try{await load();S.scr=!S.me.farm?'farm':!S.me.fields.length?'field':'app';if(S.scr=='farm')S.scr='farmSetup';if(S.scr=='field')S.scr='fieldEd';connect()}catch(e){S.scr='auth'}draw()}
 async function load(){S.me=await api('/me');if(S.me.farm){S.matches=await api('/matches');S.notif=S.matches.reduce((a,m)=>a+m.unread,0);S.notifN=(await api('/notifications')).filter(n=>!n.is_read).length;try{S.disc=await api('/discover');S.disc.concat(S.matches.map(m=>m.farm)).forEach(c=>S.known[c.id]=c)}catch(e){S.disc=[]}}}
 /* ---------- onboarding / auth ---------- */
-function onb(){const s=[['Know your land from space','NASA Earth observations plus your own field boundaries, soil and crop history build a Field DNA for every field.'],['Find farms like yours','Discover farmers with similar environmental conditions, match, and exchange real experience.'],['Plan, and hear your farm','Compare crop rotations, stress-test them with Climate Remix, get an AI action plan—and listen to your Farm Symphony.']][S.ob];return`<div style="display:flex;flex-direction:column;justify-content:space-between;min-height:92vh"><div class="row sb"><b style="color:var(--pri)">AgroMatch</b><button class="ic mut" onclick="S.scr='auth';draw()">Skip</button></div><div><h1 style="font-size:28px">${s[0]}</h1><p class="mut" style="font-size:15px">${s[1]}</p></div><div><div class="dots" style="text-align:center;margin:12px">${[0,1,2].map(i=>`<i class="${i==S.ob?'on':''}"></i>`).join('')}</div><button class="btn" onclick="S.ob<2?S.ob++:S.scr='auth';draw()">${S.ob<2?'Continue':'Get started'}</button></div></div>`}
-function auth(){const r=S.auth=='register';return`<h1 style="margin-top:30px">${r?'Create account':'Welcome back'}</h1><p class="mut">${r?'Your data is stored in this app’s local database.':'Sign in to your farm.'}</p>${r?'<label>Name</label><input id="nm">':''}<label>Email</label><input id="em" type="email" autocomplete="email"><label>Password (6+ characters)</label><input id="pw" type="password"><button class="btn" onclick="doAuth()">${r?'Sign up':'Log in'}</button><p class="mut" style="text-align:center" onclick="S.auth='${r?'login':'register'}';draw()"><u>${r?'I already have an account':'Create a new account'}</u></p>`}
+function onb(){
+ const ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b;
+ const slides=ru?[
+  ['Земля под вашим контролем.','Сохраняйте контуры полей, изучайте спутниковые слои и проверяйте климатические условия для каждой выбранной точки.'],
+  ['Решения на основе данных.','Погода, региональные показатели NASA и прозрачные рекомендации — с указанием источников и ограничений.'],
+  ['Растите вместе.','Общайтесь с фермерами, сравнивайте севообороты и задавайте вопросы AI-агроному.']
+ ]:[
+  ['Your land, in focus.','Save field boundaries, inspect satellite layers and explore conditions at selected field coordinates.'],
+  ['Decisions with evidence.','Weather, regional NASA data and transparent recommendations — each with its source and limits.'],
+  ['Grow together.','Connect with farmers, compare rotations and ask the AI agronomist for guidance.']
+ ];
+ const slide=slides[S.ob]||slides[0];
+ return `<div class="welcome-shell">
+  <div class="welcome-top"><div class="welcome-logo"><span class="welcome-mark">A</span><span><b>AGROMATCH</b><small>EARTH INTELLIGENCE</small></span></div><div class="welcome-top-actions"><button class="mini-link" onclick="toggleUiLanguage()">🌐 ${ru?'English':'Русский'}</button><button class="mini-link" onclick="S.scr='auth';draw()">${t('Пропустить','Skip')} ↗</button></div></div>
+  <div class="welcome-stage">
+   <div class="welcome-art" aria-hidden="true"><div class="welcome-globe"><span class="welcome-globe-glow">✦</span><i></i><i></i><i></i></div><div class="welcome-float-label">43.24° N, 76.92° E <span>·</span> EARTH DATA</div></div>
+   <div class="welcome-copy"><span class="welcome-kicker">0${S.ob+1} / 03 · ${t('СЕРВИС ДЛЯ ФЕРМЕРОВ','BUILT FOR GROWERS')}</span><h1>${slide[0]}</h1><p>${slide[1]}</p><div class="welcome-progress">${slides.map((_,i)=>`<i class="${i===S.ob?'active':''}"></i>`).join('')}</div><button class="btn" onclick="S.ob<2?S.ob++:S.scr='auth';draw()">${S.ob===2?t('Начать работу','Get started'):t('Продолжить','Continue')} <span aria-hidden="true">→</span></button><p class="welcome-source">${t('NASA POWER · Open-Meteo · спутниковые изображения','NASA POWER · Open-Meteo · satellite imagery')}</p></div>
+  </div>
+ </div>`;
+}
+function auth(){
+ const r=S.auth==='register',ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b;
+ return `<div class="auth-shell"><aside class="auth-story">
+  <div class="welcome-logo"><span class="welcome-mark">A</span><span><b>AGROMATCH</b><small>EARTH INTELLIGENCE</small></span></div>
+  <div class="auth-story-middle"><span class="welcome-kicker">${t('ЗЕМЛЯ · ДАННЫЕ · РЕШЕНИЯ','LAND · DATA · DECISIONS')}</span><h2>${t('Лучше понимать каждое поле.','See every field more clearly.')}</h2><p>${t('Сохраняйте поля и получайте прозрачную картину погоды, климата и спутниковых данных.','Bring field boundaries, satellite context and weather forecasts into one clear workspace.')}</p><div class="auth-story-markers"><span>NASA POWER</span><span>Open-Meteo</span><span>MapLibre</span></div></div>
+  <div class="auth-story-orbit" aria-hidden="true"></div><small class="auth-story-foot">AGROMATCH · EARTH INTELLIGENCE</small>
+ </aside><main class="auth-form-pane"><div class="auth-form-inner"><div class="auth-language"><button class="mini-link" onclick="toggleUiLanguage()">🌐 ${ru?'English':'Русский'}</button></div>
+  <span class="section-eyebrow">${r?t('НОВЫЙ АККАУНТ','NEW ACCOUNT'):t('С ВОЗВРАЩЕНИЕМ','WELCOME BACK')}</span>
+  <h1>${r?t('Создайте аккаунт','Create your account'):t('Войдите в AgroMatch','Sign in to AgroMatch')}</h1>
+  <p class="mut">${r?t('Для начала достаточно имени и электронной почты.','Start with your name and email address.'):t('Продолжайте работу с вашими полями.','Continue managing your fields.')}</p>
+  <form onsubmit="event.preventDefault();doAuth()">
+   ${r?`<label for="nm">${t('Имя','Your name')}</label><input id="nm" name="name" autocomplete="name" required placeholder="${t('Как вас зовут?','Your name')}">`:''}
+   <label for="em">Email</label><input id="em" name="email" type="email" autocomplete="email" required placeholder="you@example.com">
+   <label for="pw">${t('Пароль','Password')}</label><input id="pw" name="password" type="password" autocomplete="${r?'new-password':'current-password'}" minlength="6" required placeholder="${t('Минимум 6 символов','At least 6 characters')}">
+   <button type="submit" class="btn auth-submit">${r?t('Зарегистрироваться','Create account'):t('Войти','Sign in')} →</button>
+  </form>
+  <div class="auth-switch">${r?t('Уже есть аккаунт?','Already have an account?'):t('Впервые здесь?','New to AgroMatch?')} <button onclick="S.auth='${r?'login':'register'}';draw()">${r?t('Войти','Sign in'):t('Создать аккаунт','Create account')}</button></div>
+  <div class="auth-trust-note">ⓘ ${t('Пока используется бесплатный сервер с временным хранилищем: не сохраняйте здесь незаменимые данные.','This demo currently uses temporary hosting storage. Do not save irreplaceable farm records.')}</div>
+ </div></main></div>`;
+}
 const doAuth=()=>tryit(async()=>{const r=await api('/'+(S.auth=='register'?'register':'login'),{b:{email:$('#em').value,password:$('#pw').value,name:$('#nm')?.value||''}});T=r.token;localStorage.tok=T;await boot()});
 /* ---------- farm & field setup ---------- */
 function farmSetup(){const f=S.me.farm||{};return`<h1 style="margin-top:14px">${f.id?'Edit farm':'Register your farm'}</h1><label>Farm name</label><input id="fn" value="${esc(f.name||'')}"><label>Find location</label><div class="row"><input id="fq" placeholder="Village, region or country" style="margin:4px 0 10px" value="${esc(f.region||'')}"><button class="btn s" onclick="findLoc()">Search</button></div><div id="fmap" class="map"></div><div class="mut" id="floc">${S.loc||f.id?`Location set: ${(S.loc||f).lat.toFixed(4)}, ${(S.loc||f).lon.toFixed(4)}`:'Search or tap the map to set farm location.'}</div><label style="display:block;margin-top:10px">Farming practice</label><select id="fp">${['conventional','no-till','organic','regenerative'].map(p=>`<option ${f.practice==p?'selected':''}>${p}</option>`).join('')}</select><label>Priorities</label><div>${['Save water','Soil health','Profit','Low inputs','Resilience','Knowledge sharing','Equipment sharing','Joint purchases'].map(p=>`<button class="chip ${S.pri.includes(p)?'on':''}" onclick="S.pri.includes('${p}')?S.pri.splice(S.pri.indexOf('${p}'),1):S.pri.push('${p}');this.classList.toggle('on')">${p}</button>`).join('')}</div><button class="btn" style="margin-top:12px" onclick="saveFarm()">${f.id?'Save':'Continue: add fields'}</button>${f.id?'<button class="btn o" style="margin-top:8px" onclick="S.scr=\'app\';draw()">Cancel</button>':''}`}
@@ -62,22 +102,116 @@ const SOILS=['Unknown','Clay','Clay loam','Loam','Sandy loam','Sand','Silt loam'
 function fieldEd(){const f=S.edit?S.me.fields.find(x=>x.id==S.edit):null,y=new Date().getFullYear(),c=f?f.crops:[];return`<h1 style="margin-top:14px">${f?'Edit field':'Add a field'}</h1><p class="mut">Tap the map to place boundary corners. Satellite imagery is real; boundary is yours.</p><div class="row" style="gap:6px"><input id="sq" placeholder="Search place" style="margin:0"><button class="btn s" onclick="tryit(async()=>{const g=await geocode($('#sq').value);maps.fed.flyTo({center:[g.lon,g.lat],zoom:16})})">Go</button></div><div id="fed" class="map big" style="height:300px"></div><div class="row"><span class="mut" id="pc2">${S.pts.length} points</span><button class="btn o s" onclick="S.pts.pop();upd()">Undo</button><button class="btn o s" onclick="S.pts=[];upd()">Clear</button></div><label style="display:block;margin-top:10px">Field name</label><input id="ffn" value="${esc(f?.name||'')}"><div class="g2"><div><label>Soil type</label><select id="fs">${SOILS.map(s=>`<option ${f?.soil==s?'selected':''}>${s}</option>`).join('')}</select></div><div><label>Soil data source</label><select id="fss">${[['unknown','Not known'],['farmer-provided','My estimate'],['farmer-tested','Lab soil test']].map(s=>`<option value="${s[0]}" ${f?.soil_source==s[0]?'selected':''}>${s[1]}</option>`).join('')}</select></div></div><label>Crop history (oldest → latest)</label><div class="row">${[2,1,0].map((k,i)=>`<select id="cr${i}" style="flex:1">${CROPS.map(x=>`<option ${(c[i]||'').split(' ').pop()==x?'selected':''}>${x}</option>`).join('')}</select>`).join('')}</div><div class="mut" style="margin-bottom:10px">Years: ${y-2}, ${y-1}, ${y}</div><button class="btn" id="svf" onclick="saveField()">Save field & fetch NASA data</button>${S.me.fields.length?'<button class="btn o" style="margin-top:8px" onclick="S.scr=\'app\';S.edit=null;draw()">Cancel</button>':''}`}
 function upd(){const m=maps.fed;if(m&&m.getSource('draw')){m.getSource('draw').setData(geo(S.pts))}$('#pc2').textContent=S.pts.length+' points'}
 function geo(p){const f=[];if(p.length>=3)f.push({type:'Feature',geometry:{type:'Polygon',coordinates:[[...p,p[0]]]}});if(p.length>=2)f.push({type:'Feature',geometry:{type:'LineString',coordinates:p}});p.forEach(q=>f.push({type:'Feature',geometry:{type:'Point',coordinates:q}}));return fc(f)}
-const saveField=()=>tryit(async()=>{if(S.pts.length<3)throw new Error('Draw at least 3 corners');const y=new Date().getFullYear(),b={name:$('#ffn').value||'Field',polygon:S.pts,soil:$('#fs').value=='Unknown'?'':$('#fs').value,soil_source:$('#fss').value,crops:[2,1,0].map((k,i)=>`${y-k} ${$('#cr'+i).value}`)};$('#svf').disabled=true;$('#svf').textContent='Fetching NASA POWER data (up to ~30 s)…';try{S.edit?await api('/fields/'+S.edit,{m:'PUT',b}):await api('/fields',{b})}finally{}await load();S.scr='app';S.tab='home';S.edit=null;S.pts=[];draw();toast('Field saved. Field DNA ready')});
+const saveField=()=>tryit(async()=>{if(S.pts.length<3)throw new Error('Draw at least 3 corners');const y=new Date().getFullYear(),b={name:$('#ffn').value||'Field',polygon:S.pts,soil:$('#fs').value=='Unknown'?'':$('#fs').value,soil_source:$('#fss').value,crops:[2,1,0].map((k,i)=>`${y-k} ${$('#cr'+i).value}`)};const button=$('#svf'),label=button?.textContent||'Save field';if(button){button.disabled=true;button.textContent='Fetching NASA POWER data…'}try{S.edit?await api('/fields/'+S.edit,{m:'PUT',b}):await api('/fields',{b});await load();S.scr='app';S.tab='home';S.edit=null;S.pts=[];draw();toast('Field saved. Field DNA ready')}finally{if(button&&button.isConnected){button.disabled=false;button.textContent=label}}});
 /* ---------- home ---------- */
 function alerts(f){const m=f.snapshots[0].metrics,out=[];if(m.wetness<.3)out.push(['Low root-zone soil wetness ('+m.wetness+')','warn']);if(m.trend<-.04)out.push(['Soil wetness declining vs 12 months ago','warn']);if(m.rain_cv>1.3)out.push(['Erratic monthly rainfall (CV '+m.rain_cv+')','warn']);return out.map(a=>`<div class="warn">${f.name}: ${a[0]} · ${m.simulated?tag('s'):tag('n')}</div>`).join('')}
-function home(){const fs=S.me.fields,farm=S.me.farm,first=fs[0];return hdr('Hello, '+esc(S.me.user.name||'farmer'),esc(farm.name)+' · '+esc(farm.region))+
-(S.me?.hosting?.storage_mode==='ephemeral'?'<div class="data-retention-note"><b>⚠️ Демонстрационный режим / Demo mode.</b> Бесплатный Render не сохраняет SQLite надёжно после перезапуска или нового развёртывания. Экспортируйте нужные данные. / Data may be lost on restart or redeploy.</div>':'')+
-`<div class="hero-panel"><div class="hero-eyebrow">INTELLIGENCE FROM ABOVE</div><h2>Better decisions begin with understanding the land.</h2><p>Connect climate intelligence, field observations and grower experience. From orbit to action.</p><button class="btn s" onclick="tab('earth')">Explore Earth →</button></div>`+
-`<div class="section-eyebrow">FARM AT A GLANCE</div><div class="g2"><div class="metric"><span class="mut">Fields monitored</span><b>${fs.length}</b></div><div class="metric"><span class="mut">Total area</span><b>${fs.reduce((a,f)=>a+f.area_ha,0).toFixed(1)} ha</b></div></div><div class="row sb" style="margin-top:20px"><h2>My fields</h2><button class="chip" onclick="tab('fields')">View all</button></div><div class="feature-grid">${fs.map(f=>{const s=f.snapshots[0],m=s?.metrics;return `<div class="field-tile" onclick="ovField(${f.id})"><div class="row sb"><h3>${esc(f.name)}</h3>${s?lvpill(s.level,s.harmony):''}</div><div class="mut">${f.area_ha} ha · ${esc(f.soil||'soil unknown')} · ${m?.simulated?tag('s'):tag('n')}</div><div class="key-stats"><span>Rain / year<b>${m?.rain_mm??'—'} mm</b></span><span>Mean temperature<b>${m?.temp_c??'—'} °C</b></span></div><span class="read-more">Explore field →</span></div>`}).join('')}</div><button class="btn o" onclick="S.scr='fieldEd';S.edit=null;S.pts=[];draw()">+ Add field</button><div class="row sb" style="margin-top:20px"><h2>Early signals</h2><button class="chip" onclick="tab('doctor')">Field Doctor</button></div>${fs.map(alerts).join('')||'<p class="mut">No thresholds triggered. Routine inspection remains important.</p>'}<div class="feature-grid"><div class="feature-panel"><div class="section-eyebrow">WEATHER OUTLOOK</div><h2>Next 7 days</h2><div id="homeForecast"><p class="mut">Loading forecast…</p></div><button class="btn o s" onclick="tab('weather')">Full climate view</button></div><div class="feature-panel"><div class="section-eyebrow">FARM COMMUNITY</div><h2>Grower updates</h2><div id="homeFeed"><p class="mut">Loading community…</p></div><button class="btn o s" onclick="tab('feed')">Open Farm Feed</button></div></div><div class="mut">NASA POWER provides coarse regional climate context, not measurements at each field. Last available data: ${first?.snapshots[0]?.metrics.last_obs||'unknown'}.</div>`}
+
+function dashboardFieldCard(f){
+ const sn=f.snapshots?.[0],m=sn?.metrics||{};
+ const ru=uiLanguage()==='ru',txt=(a,b)=>ru?a:b;
+ const status=m.simulated?tag('s'):m.source?tag('n'):'<span class="source-unknown">NO DATA</span>';
+ return `<article class="dashboard-field-card">
+  <div class="dashboard-field-top"><span class="field-icon" aria-hidden="true">▧</span><span class="dashboard-field-state">${status}</span></div>
+  <h3>${esc(f.name)}</h3><p class="mut">${Number(f.area_ha||0).toLocaleString(ru?'ru-RU':'en-US')} ha · ${esc(f.soil||txt('Почва не указана','Soil not specified'))}</p>
+  <div class="dashboard-field-data"><span>${txt('Осадки за период','Period rain')}<b>${m.rain_mm==null?'—':esc(m.rain_mm)+' mm'}</b></span><span>${txt('Средняя температура','Mean temp.')}<b>${m.temp_c==null?'—':esc(m.temp_c)+' °C'}</b></span></div>
+  <div class="dashboard-field-links"><button class="mini-link" onclick="ovField(${f.id})">${txt('Анализ поля','Field details')} ↗</button><button class="mini-link" onclick="focusEarthField(${f.id})">${txt('На карте','On map')} →</button></div>
+ </article>`;
+}
+function dashboardSignal(f){
+ const m=f.snapshots?.[0]?.metrics;if(!m)return null;
+ const ru=uiLanguage()==='ru';
+ if(m.simulated)return {kind:'neutral',name:f.name,text:ru?'Климатическая история содержит демонстрационные оценки.':'Climate history contains simulated examples.',type:'SIMULATED'};
+ if(m.wetness!=null&&m.wetness<.30)return {kind:'warning',name:f.name,text:ru?'Низкая модельная влажность корневого слоя. Проверьте почву на месте.':'Low modeled root-zone wetness. Check soil on site.',type:'MODEL'};
+ if(m.trend!=null&&m.trend<-.04)return {kind:'warning',name:f.name,text:ru?'По модели влажность снижается. Нужна проверка на участке.':'Modeled soil moisture is declining. Check the field.',type:'MODEL'};
+ if(m.rain_cv!=null&&m.rain_cv>1.3)return {kind:'info',name:f.name,text:ru?'Исторические осадки сильно меняются по месяцам.':'Historically variable monthly rainfall.',type:'NASA POWER'};
+ return null;
+}
+function downloadFieldsGeoJSON(){
+ const fields=S.me?.fields||[];
+ if(!fields.length){toast(uiLanguage()==='ru'?'Пока нет полей для экспорта':'No fields to export');return}
+ const features=fields.filter(f=>Array.isArray(f.polygon)&&f.polygon.length>=3).map(f=>{
+  const polygon=f.polygon.map(p=>[Number(p[0]),Number(p[1])]);
+  const first=polygon[0],last=polygon[polygon.length-1];
+  if(last[0]!==first[0]||last[1]!==first[1])polygon.push([...first]);
+  return {type:'Feature',properties:{id:f.id,name:f.name,area_ha:f.area_ha,soil:f.soil||null},geometry:{type:'Polygon',coordinates:[polygon]}};
+ });
+ const blob=new Blob([JSON.stringify({type:'FeatureCollection',features},null,2)],{type:'application/geo+json'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='agromatch-my-fields.geojson';document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function focusEarthField(id){
+ const f=S.me?.fields?.find(x=>x.id===Number(id));S.earthFocus=f?.id||null;if(f)S.extraField=f.id;S.cam=null;S.tab='earth';draw();
+}
+function home(){
+ const fs=S.me.fields||[],farm=S.me.farm||{},ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b;
+ const number=n=>Number(n||0).toLocaleString(ru?'ru-RU':'en-US',{maximumFractionDigits:1});
+ const known=fs.filter(f=>f.snapshots?.[0]?.metrics?.simulated===false).length;
+ const signals=fs.map(dashboardSignal).filter(Boolean).slice(0,3);
+ const area=fs.reduce((sum,f)=>sum+(Number(f.area_ha)||0),0);
+ const user=(S.me.user?.name||'').trim().split(/\s+/)[0];
+ return hdr(t('Рабочая панель','Overview'),esc(farm.name||'AgroMatch')+' · '+esc(farm.region||t('Регион не задан','No region')))+
+ (S.me?.hosting?.storage_mode==='ephemeral'?'<div class="data-retention-note"><b>⚠️ '+t('Демонстрационное хранение','Demo storage')+'</b>'+t('Данные на бесплатном Render могут исчезнуть после перезапуска. Экспортируйте границы полей.','Data on Render Free may be lost after a restart. Export field boundaries.')+'</div>':'')+
+ `<div class="command-center">
+ <section class="command-hero" aria-label="${t('Обзор хозяйства','Farm overview')}">
+  <div class="command-hero-content">
+   <div class="command-badge"><span class="command-badge-pulse"></span> AGROMATCH / EARTH INTELLIGENCE</div>
+   <h2>${t('Вся ваша земля.','All your fields.')}<br><em>${t('Одна ясная картина.','One clear picture.')}</em></h2>
+   <p>${t('Спутниковые слои, прогноз погоды и анализ каждого поля — от общей картины до конкретной точки.','Satellite layers, weather forecasts and field-by-field analysis — from the big picture down to a selected point.')}</p>
+   <div class="command-hero-actions"><button class="btn command-primary" onclick="tab('earth')">${t('Открыть карту','Explore map')} <span aria-hidden="true">↗</span></button><button class="btn command-secondary" onclick="S.scr='fieldEd';S.edit=null;S.pts=[];draw()">+ ${t('Добавить поле','Add field')}</button></div>
+  </div>
+  <div class="command-hero-visual" aria-hidden="true"><div class="orbit-orb"><i></i><i></i><i></i><span>✦</span></div><div class="command-orbit-tag">NASA POWER / OPEN-METEO</div></div>
+ </section>
+ <section class="command-stats" aria-label="${t('Ключевые показатели','Key metrics')}">
+  <div class="command-stat"><span class="stat-symbol">▦</span><span class="stat-label">${t('Мои поля','My fields')}</span><strong>${fs.length}</strong><small>${t('Контуры сохранены','Saved boundaries')}</small></div>
+  <div class="command-stat"><span class="stat-symbol">◈</span><span class="stat-label">${t('Площадь','Total area')}</span><strong>${number(area)} <small>ha</small></strong><small>${t('Приблизительный расчёт','Approximate polygon area')}</small></div>
+  <div class="command-stat"><span class="stat-symbol">◉</span><span class="stat-label">${t('Доступна история','Climate history')}</span><strong>${known}<small> / ${fs.length}</small></strong><small>${t('Региональные данные, не датчики','Regional data, not sensors')}</small></div>
+  <div class="command-stat"><span class="stat-symbol">↗</span><span class="stat-label">${t('Текущий регион','Farm region')}</span><strong class="stat-region">${esc((farm.region||'—').split(',')[0])}</strong><small>${t('Глобальное покрытие карты','Worldwide map coverage')}</small></div>
+ </section>
+ <div class="command-grid">
+  <section class="feature-panel command-map-section"><div class="command-section-header"><div><div class="section-eyebrow">01 / ${t('ГЕОДАННЫЕ','GEOSPATIAL')}</div><h2>${t('Карта хозяйства','Farm map')}</h2><p class="mut">${t('Контуры сохранённых участков · нажмите на поле','Your saved boundaries · select a field')}</p></div><button class="btn o s" onclick="tab('earth')">${t('На весь экран','Full map')} ↗</button></div>
+   <div class="command-map-shell"><div id="homeFarmMap" class="command-map" role="region" aria-label="${t('Карта полей','Field map')}"></div><div class="command-map-overlay"><span class="map-dot"></span>${t('Спутниковая подложка','Satellite basemap')}</div></div>
+   <div class="command-map-footer"><span><i class="map-legend-dot"></i>${t('Сохранённые поля','Saved fields')}</span><button class="mini-link" onclick="downloadFieldsGeoJSON()">↓ GeoJSON</button></div>
+  </section>
+  <section class="feature-panel command-insights"><div class="section-eyebrow">02 / ${t('РЕШЕНИЯ','ACTION CENTER')}</div><h2>${t('На что обратить внимание','What needs attention')}</h2><p class="mut">${t('Сигналы модели — повод проверить поле, не готовый диагноз.','Model-based signals suggest what to inspect; they are not diagnoses.')}</p>
+    <div class="command-signals">${signals.length?signals.map(item=>`<div class="command-signal ${item.kind}"><span class="signal-symbol">${item.kind==='warning'?'!':item.kind==='neutral'?'i':'↗'}</span><div><b>${esc(item.name)}</b><p>${esc(item.text)}</p><small>${esc(item.type)}</small></div></div>`).join(''):`<div class="command-signal clear"><span class="signal-symbol">✓</span><div><b>${t('Новых сигналов нет','No active signals')}</b><p>${t('Продолжайте регулярные осмотры участка.','Continue routine in-field checks.')}</p></div></div>`}</div>
+    <button class="btn o s command-insights-cta" onclick="tab('doctor')">${t('Проверка полей','Open Field Doctor')} ↗</button>
+  </section>
+  <section class="command-fields-section"><div class="command-section-header"><div><div class="section-eyebrow">03 / ${t('УЧАСТКИ','PARCELS')}</div><h2>${t('Ваши поля','Your fields')}</h2><p class="mut">${t('Актуальные параметры и история','Conditions and history at a glance')}</p></div><button class="btn o s" onclick="tab('fields')">${t('Все поля','View all')} ↗</button></div>
+    <div class="command-field-grid">${fs.slice(0,4).map(dashboardFieldCard).join('')}</div>
+    ${fs.length>4?`<button class="mini-link" onclick="tab('fields')">+ ${fs.length-4} ${t('остальных полей','more fields')} →</button>`:''}
+  </section>
+  <section class="command-side-stack"><div class="feature-panel command-mini-panel"><div class="section-eyebrow">04 / OPEN-METEO</div><div class="command-section-header"><h2>${t('Погода','Weather outlook')}</h2><button class="mini-link" onclick="tab('weather')">${t('7 дней','7 days')} ↗</button></div><div id="homeForecast"><p class="mut">${t('Загрузка прогноза…','Loading forecast…')}</p></div></div>
+    <div class="feature-panel command-mini-panel"><div class="section-eyebrow">05 / ${t('СООБЩЕСТВО','COMMUNITY')}</div><div class="command-section-header"><h2>${t('Фермерская сеть','Grower network')}</h2><button class="mini-link" onclick="tab('feed')">${t('Открыть','Open')} ↗</button></div><div id="homeFeed"><p class="mut">${t('Загрузка записей…','Loading updates…')}</p></div></div>
+  </section>
+ </div>
+ <p class="command-disclaimer">${t('Источники: NASA POWER — региональная климатическая оценка, Open-Meteo — прогноз модели. Условия конкретного участка требуют проверки на месте.','Sources: NASA POWER is regional climate context; Open-Meteo is modeled forecast. Conditions on a specific parcel require on-site verification.')}</p>
+ </div>`;
+}
 /* ---------- earth ---------- */
-function earth(){const d=new Date(Date.now()-10*864e5).toISOString().slice(0,10);
- return hdr('Earth','Нажми на выделенное поле → получи погоду и региональные NASA-данные для выбранной точки')+
- `<div class="earth-search"><input id="eq" placeholder="Город или координаты: 43.24, 76.92" aria-label="Поиск места"><button class="btn s" onclick="tryit(async()=>{const g=await geocode($('#eq').value);maps.earth.flyTo({center:[g.lon,g.lat],zoom:13,pitch:45})})">Найти</button><button class="btn o s" onclick="zoomToMyFields()">Мои поля</button></div>
- <div class="earth-controls"><div class="section-eyebrow">СЛОЙ КАРТЫ</div><div id="lays" class="earth-layer-tabs">${Object.entries(LAY).map(([k,v])=>`<button class="chip ${k==S.layer?'on':''}" data-k="${k}" onclick="setLayer('${k}',$('#ed').value)">${esc(v.n)}</button>`).join('')}</div>
- <div class="earth-options"><label>Дата снимка <input type="date" id="ed" value="${d}" max="${new Date().toISOString().slice(0,10)}" onchange="setLayer(S.layer,this.value)"></label><button class="btn o s" onclick="const m=maps.earth;m.easeTo({pitch:m.getPitch()>10?0:60})">2D / 3D</button></div></div>
- <div class="earth-map-wrap"><div id="earth" class="map big"></div><div class="earth-map-hint">📍 Нажмите внутри зелёного контура своего поля, чтобы увидеть условия именно в выбранной точке.</div></div>
- <div id="esel" class="point-panel"><div class="feature-panel"><b>Выбери точку на поле</b><p class="mut">Показываются данные погодной модели и климатической сетки. Это не измерения датчика на участке.</p></div></div>
- <div id="einfo" class="card"></div>${satellitePanel()}`;
+function earth(){
+ const d=new Date(Date.now()-10*864e5).toISOString().slice(0,10);
+ const fields=S.me?.fields||[],ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b;
+ return hdr(t('Карта и спутники','Satellite Earth'),t('Спутниковые слои, сохранённые поля и климатические условия выбранной точки','Imagery layers, saved parcels and climate context for selected coordinates'))+
+ `<section class="earth-studio">
+  <div class="earth-studio-toolbar">
+   <div class="earth-search"><label class="sr-only" for="eq">${t('Поиск места или координат','Search a place or coordinates')}</label><input id="eq" placeholder="${t('Город или координаты: 43.24, 76.92','Place or coordinates: 43.24, 76.92')}" aria-label="${t('Поиск места или координат','Search a place or coordinates')}"><button class="btn s" onclick="tryit(async()=>{const g=await geocode($('#eq').value);maps.earth.flyTo({center:[g.lon,g.lat],zoom:13,pitch:40})})">${t('Найти','Search')}</button><button class="btn o s" onclick="zoomToMyFields()">⌖ ${t('Мои поля','My fields')}</button></div>
+   <div class="earth-field-strip"><span class="earth-field-label">${t('Быстрый переход:','Jump to:')}</span>${fields.map(f=>`<button class="earth-field-pill" onclick="focusEarthField(${f.id})"><span class="map-legend-dot"></span>${esc(f.name)}</button>`).join('')}</div>
+  </div>
+  <div class="earth-controls">
+   <div class="earth-control-title"><div><div class="section-eyebrow">NASA / EARTH OBSERVATION</div><b>${t('Визуальные слои','Visual map layers')}</b></div><span class="earth-control-note">${t('Не числовые измерения','Not pixel measurements')}</span></div>
+   <div id="lays" class="earth-layer-tabs" role="group" aria-label="${t('Слои карты','Map layers')}">${Object.entries(LAY).map(([k,v])=>`<button class="chip ${k==S.layer?'on':''}" data-k="${k}" onclick="setLayer('${k}',$('#ed').value)">${esc(v.n)}</button>`).join('')}</div>
+   <div class="earth-options"><label>${t('Дата слоя','Layer date')} <input type="date" id="ed" value="${d}" max="${new Date().toISOString().slice(0,10)}" onchange="setLayer(S.layer,this.value)"></label><div class="earth-timeline-actions"><button class="btn o s" onclick="shiftEarthDate(-8)" title="8 days earlier">−8d</button><button class="btn o s" onclick="shiftEarthDate(8)" title="8 days later">+8d</button></div><label class="earth-opacity-control">${t('Прозрачность слоя','Layer opacity')} <span id="opacityValue">${Math.round((S.layerOpacity??.75)*100)}%</span><input id="earthOpacity" type="range" min="0" max="100" step="5" value="${Math.round((S.layerOpacity??.75)*100)}" oninput="setLayerOpacity(this.value)" aria-label="${t('Прозрачность слоя NASA','NASA overlay opacity')}"></label><button class="btn o s" onclick="const m=maps.earth;m.easeTo({pitch:m.getPitch()>10?0:60})">◫ 2D / 3D</button></div>
+  </div>
+  <div class="earth-workspace-grid">
+   <div class="earth-workspace-map">
+    <div class="earth-map-wrap"><div id="earth" class="map big" role="region" aria-label="${t('Спутниковая карта полей','Satellite field map')}"></div><div class="earth-map-hint">↗ ${t('Нажмите внутри зелёного контура, чтобы получить условия для точки.','Click inside a green field boundary to inspect conditions at that point.')}</div></div>
+    <div id="einfo" class="earth-layer-info card"></div>
+   </div>
+   <aside id="esel" class="point-panel"><div class="feature-panel point-idle"><span class="point-idle-mark">⌖</span><div class="section-eyebrow">${t('ИНСПЕКТОР ТОЧКИ','POINT INSPECTOR')}</div><h2>${t('Выберите точку на карте','Select a point on the map')}</h2><p class="mut">${t('Кликните внутри сохранённого поля. Мы покажем прогноз и исторические региональные данные NASA для этих координат.','Click inside a saved field. The inspector shows a forecast and regional NASA history for those coordinates.')}</p><div class="point-idle-detail">Open-Meteo · NASA POWER</div><p class="footnote">${t('Прогноз и спутниковая сетка не заменяют локальные датчики и осмотр участка.','Forecasts and gridded data are not substitutes for sensors or field inspection.')}</p></div></aside>
+  </div>
+  <div class="earth-research-section"><div class="section-eyebrow">NASA / DATA EXTRACTION</div><h2>${t('Спутниковая лаборатория','Satellite data lab')}</h2><p class="mut">${t('Проверяйте наличие продуктов, даты и качество данных перед агрономическими выводами.','Verify product availability, dates and quality before drawing agronomic conclusions.')}</p>${satellitePanel()}</div>
+ </section>`;
 }
 function zoomToMyFields(){
  const fields=S.me?.fields||[],m=maps.earth;
@@ -91,6 +225,12 @@ function pointMetric(name,value,unit='',note=''){
 async function loadMapPoint(fid,lat,lon,refresh=false){
  const el=$('#esel');if(!el)return;
  const f=S.me.fields.find(x=>x.id===fid);if(!f)return;
+ if(S.extraField!==fid){
+  S.extraField=fid;
+  const sel=document.querySelector('.satellite-lab select');if(sel)sel.value=String(fid);
+  if(typeof loadEarthIntelligence==='function')loadEarthIntelligence();
+  if(typeof loadSatellite==='function')loadSatellite();
+ }
  if(S.earthMarker){S.earthMarker.remove();S.earthMarker=null}
  if(maps.earth&&window.maplibregl)S.earthMarker=new maplibregl.Marker({color:'#F0A438'}).setLngLat([lon,lat]).addTo(maps.earth);
  const seq=S.earthPointSeq=(S.earthPointSeq||0)+1;
@@ -141,9 +281,18 @@ function downloadPointReport(){
  link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();
  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-function after(){if(S.scr=='fieldEd'){const m=mkMap('fed',{center:S.me.farm?[S.me.farm.lon,S.me.farm.lat]:[0,20],zoom:S.me.farm?15:2,onload:m=>{m.addSource('draw',{type:'geojson',data:geo(S.pts)});m.addLayer({id:'dfill',type:'fill',source:'draw',filter:['==','$type','Polygon'],paint:{'fill-color':'#7CFC9A','fill-opacity':.3}});m.addLayer({id:'dline',type:'line',source:'draw',filter:['==','$type','LineString'],paint:{'line-color':'#fff','line-width':2.5}});m.addLayer({id:'dpt',type:'circle',source:'draw',filter:['==','$type','Point'],paint:{'circle-radius':5,'circle-color':'#1F4D36','circle-stroke-color':'#fff','circle-stroke-width':2}});if(S.edit){const f=S.me.fields.find(x=>x.id==S.edit);if(!S.pts.length)S.pts=f.polygon.slice();upd();fit(m,S.pts)}}});m.on('click',e=>{S.pts.push([e.lngLat.lng,e.lngLat.lat]);upd()});m.getCanvas().style.cursor='crosshair'}
+function after(){
+ if(S.scr==='app'&&S.tab==='home'&&S.me?.fields?.length){
+  const fields=S.me.fields,farm=S.me.farm;
+  mkMap('homeFarmMap',{center:[farm?.lon||fields[0].lon,farm?.lat||fields[0].lat],zoom:11,pitch:0,onload:m=>{
+   addFields(m,fields,id=>ovField(Number(id)));
+   const coords=fields.flatMap(f=>f.polygon||[]);
+   if(coords.length)fit(m,coords);
+  }});
+ }
+ if(S.scr=='fieldEd'){const m=mkMap('fed',{center:S.me.farm?[S.me.farm.lon,S.me.farm.lat]:[0,20],zoom:S.me.farm?15:2,onload:m=>{m.addSource('draw',{type:'geojson',data:geo(S.pts)});m.addLayer({id:'dfill',type:'fill',source:'draw',filter:['==','$type','Polygon'],paint:{'fill-color':'#7CFC9A','fill-opacity':.3}});m.addLayer({id:'dline',type:'line',source:'draw',filter:['==','$type','LineString'],paint:{'line-color':'#fff','line-width':2.5}});m.addLayer({id:'dpt',type:'circle',source:'draw',filter:['==','$type','Point'],paint:{'circle-radius':5,'circle-color':'#1F4D36','circle-stroke-color':'#fff','circle-stroke-width':2}});if(S.edit){const f=S.me.fields.find(x=>x.id==S.edit);if(!S.pts.length)S.pts=f.polygon.slice();upd();fit(m,S.pts)}}});m.on('click',e=>{S.pts.push([e.lngLat.lng,e.lngLat.lat]);upd()});m.getCanvas().style.cursor='crosshair'}
  if(S.scr=='farmSetup'){const f=S.me?.farm,m=mkMap('fmap',{center:f?[f.lon,f.lat]:[0,20],zoom:f?11:1.4});m.on('click',e=>setLoc(e.lngLat.lat,e.lngLat.lng,''));if(f){S.mk=new maplibregl.Marker({color:'#1F4D36'}).setLngLat([f.lon,f.lat]).addTo(m)}}
- if(S.scr=='app'&&S.tab=='earth'){const fs=S.me.fields,c=S.cam;mkMap('earth',{center:c?c.center:fs[0]?[fs[0].lon,fs[0].lat]:[0,20],zoom:c?c.zoom:fs[0]?14:1.5,pitch:c?c.pitch:fs[0]?50:0,onload:m=>{addFields(m,fs,(id,point)=>{const f=fs.find(x=>x.id==id);if(!f)return;loadMapPoint(f.id,point.lat,point.lng)});setLayer(S.layer,$('#ed').value)}});maps.earth.on('moveend',()=>{const m=maps.earth;if(m)S.cam={center:m.getCenter().toArray(),zoom:m.getZoom(),pitch:m.getPitch()}});maps.earth.on('error',e=>{if(e.sourceId=='gibs')$('#einfo')&&0})}
+ if(S.scr=='app'&&S.tab=='earth'){const fs=S.me.fields,c=S.cam;mkMap('earth',{center:c?c.center:fs[0]?[fs[0].lon,fs[0].lat]:[0,20],zoom:c?c.zoom:fs[0]?14:1.5,pitch:c?c.pitch:fs[0]?50:0,onload:m=>{addFields(m,fs,(id,point)=>{const f=fs.find(x=>x.id==id);if(!f)return;loadMapPoint(f.id,point.lat,point.lng)});setLayer(S.layer,$('#ed').value);if(S.earthFocus){const chosen=fs.find(f=>f.id===S.earthFocus);if(chosen?.polygon?.length)fit(m,chosen.polygon);S.earthFocus=null}}});maps.earth.on('moveend',()=>{const m=maps.earth;if(m)S.cam={center:m.getCenter().toArray(),zoom:m.getZoom(),pitch:m.getPitch()}});maps.earth.on('error',e=>{if(e.sourceId=='gibs')$('#einfo')&&0})}
  if(S.scr=='app'&&S.tab=='rot')loadRot();if(S.scr=='app'&&['disc','match'].includes(S.tab))bindSwipe();if(S.scr=='app'&&S.tab=='co')0}
 /* ---------- overlays ---------- */
 function ovOpen(h){closeOv();$('#app').insertAdjacentHTML('beforeend',`<div class="over" id="ov"><div class="row" style="margin-bottom:8px"><button class="ic" onclick="closeOv()">${ic('back')}</button></div>${h}</div>`);S.ov=1}
