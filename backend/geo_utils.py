@@ -14,15 +14,21 @@ def contains_point(lon, lat, ring):
     """Treat boundary points as inside. Unwrap around query longitude."""
     if len(ring) < 3 or not all(math.isfinite(x) for x in (lon, lat)):
         return False
-    points = [(_delta_lon(x, lon), y) for x, y in ring]
+    # Unwrap around the polygon, not the clicked point. Otherwise a
+    # dateline-crossing parcel would falsely include the whole world.
+    points = [(ring[0][0], ring[0][1])]
+    for x, y in ring[1:]:
+        previous_x = points[-1][0]
+        points.append((previous_x + _delta_lon(x, previous_x), y))
+    query_x = points[0][0] + _delta_lon(lon, points[0][0])
     inside = False
     for (x1, y1), (x2, y2) in zip(points, points[1:] + points[:1]):
-        cross = (-x1) * (y2 - y1) - (lat - y1) * (x2 - x1)
-        if abs(cross) <= 1e-10 and min(x1, x2)-1e-9 <= 0 <= max(x1,x2)+1e-9 and min(y1,y2)-1e-9 <= lat <= max(y1,y2)+1e-9:
+        cross = (query_x-x1) * (y2-y1) - (lat-y1) * (x2-x1)
+        if abs(cross) <= 1e-10 and min(x1,x2)-1e-9 <= query_x <= max(x1,x2)+1e-9 and min(y1,y2)-1e-9 <= lat <= max(y1,y2)+1e-9:
             return True
         if (y1 > lat) != (y2 > lat):
-            intersect = x1 + (x2 - x1) * (lat - y1) / (y2 - y1)
-            if intersect > 0:
+            intersect = x1 + (x2-x1) * (lat-y1) / (y2-y1)
+            if intersect > query_x:
                 inside = not inside
     return inside
 
