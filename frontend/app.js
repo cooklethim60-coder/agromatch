@@ -65,10 +65,89 @@ function geo(p){const f=[];if(p.length>=3)f.push({type:'Feature',geometry:{type:
 const saveField=()=>tryit(async()=>{if(S.pts.length<3)throw new Error('Draw at least 3 corners');const y=new Date().getFullYear(),b={name:$('#ffn').value||'Field',polygon:S.pts,soil:$('#fs').value=='Unknown'?'':$('#fs').value,soil_source:$('#fss').value,crops:[2,1,0].map((k,i)=>`${y-k} ${$('#cr'+i).value}`)};$('#svf').disabled=true;$('#svf').textContent='Fetching NASA POWER data (up to ~30 s)…';try{S.edit?await api('/fields/'+S.edit,{m:'PUT',b}):await api('/fields',{b})}finally{}await load();S.scr='app';S.tab='home';S.edit=null;S.pts=[];draw();toast('Field saved. Field DNA ready')});
 /* ---------- home ---------- */
 function alerts(f){const m=f.snapshots[0].metrics,out=[];if(m.wetness<.3)out.push(['Low root-zone soil wetness ('+m.wetness+')','warn']);if(m.trend<-.04)out.push(['Soil wetness declining vs 12 months ago','warn']);if(m.rain_cv>1.3)out.push(['Erratic monthly rainfall (CV '+m.rain_cv+')','warn']);return out.map(a=>`<div class="warn">${f.name}: ${a[0]} · ${m.simulated?tag('s'):tag('n')}</div>`).join('')}
-function home(){const fs=S.me.fields,farm=S.me.farm,first=fs[0];return hdr('Hello, '+esc(S.me.user.name||'farmer'),esc(farm.name)+' · '+esc(farm.region))+
-(S.me?.hosting?.storage_mode==='ephemeral'?'<div class="data-retention-note"><b>⚠️ Демонстрационный режим / Demo mode.</b> Бесплатный Render не сохраняет SQLite надёжно после перезапуска или нового развёртывания. Экспортируйте нужные данные. / Data may be lost on restart or redeploy.</div>':'')+
-`<div class="hero-panel"><div class="hero-eyebrow">INTELLIGENCE FROM ABOVE</div><h2>Better decisions begin with understanding the land.</h2><p>Connect climate intelligence, field observations and grower experience. From orbit to action.</p><button class="btn s" onclick="tab('earth')">Explore Earth →</button></div>`+
-`<div class="section-eyebrow">FARM AT A GLANCE</div><div class="g2"><div class="metric"><span class="mut">Fields monitored</span><b>${fs.length}</b></div><div class="metric"><span class="mut">Total area</span><b>${fs.reduce((a,f)=>a+f.area_ha,0).toFixed(1)} ha</b></div></div><div class="row sb" style="margin-top:20px"><h2>My fields</h2><button class="chip" onclick="tab('fields')">View all</button></div><div class="feature-grid">${fs.map(f=>{const s=f.snapshots[0],m=s?.metrics;return `<div class="field-tile" onclick="ovField(${f.id})"><div class="row sb"><h3>${esc(f.name)}</h3>${s?lvpill(s.level,s.harmony):''}</div><div class="mut">${f.area_ha} ha · ${esc(f.soil||'soil unknown')} · ${m?.simulated?tag('s'):tag('n')}</div><div class="key-stats"><span>Rain / year<b>${m?.rain_mm??'—'} mm</b></span><span>Mean temperature<b>${m?.temp_c??'—'} °C</b></span></div><span class="read-more">Explore field →</span></div>`}).join('')}</div><button class="btn o" onclick="S.scr='fieldEd';S.edit=null;S.pts=[];draw()">+ Add field</button><div class="row sb" style="margin-top:20px"><h2>Early signals</h2><button class="chip" onclick="tab('doctor')">Field Doctor</button></div>${fs.map(alerts).join('')||'<p class="mut">No thresholds triggered. Routine inspection remains important.</p>'}<div class="feature-grid"><div class="feature-panel"><div class="section-eyebrow">WEATHER OUTLOOK</div><h2>Next 7 days</h2><div id="homeForecast"><p class="mut">Loading forecast…</p></div><button class="btn o s" onclick="tab('weather')">Full climate view</button></div><div class="feature-panel"><div class="section-eyebrow">FARM COMMUNITY</div><h2>Grower updates</h2><div id="homeFeed"><p class="mut">Loading community…</p></div><button class="btn o s" onclick="tab('feed')">Open Farm Feed</button></div></div><div class="mut">NASA POWER provides coarse regional climate context, not measurements at each field. Last available data: ${first?.snapshots[0]?.metrics.last_obs||'unknown'}.</div>`}
+
+function dashboardFieldCard(f){
+ const sn=f.snapshots?.[0],m=sn?.metrics||{};
+ const ru=uiLanguage()==='ru',txt=(a,b)=>ru?a:b;
+ const status=m.simulated?tag('s'):m.source?tag('n'):'<span class="source-unknown">NO DATA</span>';
+ return `<article class="dashboard-field-card">
+  <div class="dashboard-field-top"><span class="field-icon" aria-hidden="true">▧</span><span class="dashboard-field-state">${status}</span></div>
+  <h3>${esc(f.name)}</h3><p class="mut">${Number(f.area_ha||0).toLocaleString(ru?'ru-RU':'en-US')} ha · ${esc(f.soil||txt('Почва не указана','Soil not specified'))}</p>
+  <div class="dashboard-field-data"><span>${txt('Осадки за период','Period rain')}<b>${m.rain_mm==null?'—':esc(m.rain_mm)+' mm'}</b></span><span>${txt('Средняя температура','Mean temp.')}<b>${m.temp_c==null?'—':esc(m.temp_c)+' °C'}</b></span></div>
+  <div class="dashboard-field-links"><button class="mini-link" onclick="ovField(${f.id})">${txt('Анализ поля','Field details')} ↗</button><button class="mini-link" onclick="focusEarthField(${f.id})">${txt('На карте','On map')} →</button></div>
+ </article>`;
+}
+function dashboardSignal(f){
+ const m=f.snapshots?.[0]?.metrics;if(!m)return null;
+ const ru=uiLanguage()==='ru';
+ if(m.simulated)return {kind:'neutral',name:f.name,text:ru?'Климатическая история содержит демонстрационные оценки.':'Climate history contains simulated examples.',type:'SIMULATED'};
+ if(m.wetness!=null&&m.wetness<.30)return {kind:'warning',name:f.name,text:ru?'Низкая модельная влажность корневого слоя. Проверьте почву на месте.':'Low modeled root-zone wetness. Check soil on site.',type:'MODEL'};
+ if(m.trend!=null&&m.trend<-.04)return {kind:'warning',name:f.name,text:ru?'По модели влажность снижается. Нужна проверка на участке.':'Modeled soil moisture is declining. Check the field.',type:'MODEL'};
+ if(m.rain_cv!=null&&m.rain_cv>1.3)return {kind:'info',name:f.name,text:ru?'Исторические осадки сильно меняются по месяцам.':'Historically variable monthly rainfall.',type:'NASA POWER'};
+ return null;
+}
+function downloadFieldsGeoJSON(){
+ const fields=S.me?.fields||[];
+ if(!fields.length){toast(uiLanguage()==='ru'?'Пока нет полей для экспорта':'No fields to export');return}
+ const features=fields.filter(f=>Array.isArray(f.polygon)&&f.polygon.length>=3).map(f=>{
+  const polygon=f.polygon.map(p=>[Number(p[0]),Number(p[1])]);
+  const first=polygon[0],last=polygon[polygon.length-1];
+  if(last[0]!==first[0]||last[1]!==first[1])polygon.push([...first]);
+  return {type:'Feature',properties:{id:f.id,name:f.name,area_ha:f.area_ha,soil:f.soil||null},geometry:{type:'Polygon',coordinates:[polygon]}};
+ });
+ const blob=new Blob([JSON.stringify({type:'FeatureCollection',features},null,2)],{type:'application/geo+json'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='agromatch-my-fields.geojson';document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function focusEarthField(id){
+ const f=S.me?.fields?.find(x=>x.id===Number(id));S.earthFocus=f?.id||null;S.cam=null;S.tab='earth';draw();
+}
+function home(){
+ const fs=S.me.fields||[],farm=S.me.farm||{},ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b;
+ const number=n=>Number(n||0).toLocaleString(ru?'ru-RU':'en-US',{maximumFractionDigits:1});
+ const known=fs.filter(f=>f.snapshots?.[0]?.metrics?.simulated===false).length;
+ const signals=fs.map(dashboardSignal).filter(Boolean).slice(0,3);
+ const area=fs.reduce((sum,f)=>sum+(Number(f.area_ha)||0),0);
+ const user=(S.me.user?.name||'').trim().split(/\s+/)[0];
+ return hdr(t('Рабочая панель','Overview'),esc(farm.name||'AgroMatch')+' · '+esc(farm.region||t('Регион не задан','No region')))+
+ (S.me?.hosting?.storage_mode==='ephemeral'?'<div class="data-retention-note"><b>⚠️ '+t('Демонстрационное хранение','Demo storage')+'</b>'+t('Данные на бесплатном Render могут исчезнуть после перезапуска. Экспортируйте границы полей.','Data on Render Free may be lost after a restart. Export field boundaries.')+'</div>':'')+
+ `<div class="command-center">
+ <section class="command-hero" aria-label="${t('Обзор хозяйства','Farm overview')}">
+  <div class="command-hero-content">
+   <div class="command-badge"><span class="command-badge-pulse"></span> AGROMATCH / EARTH INTELLIGENCE</div>
+   <h2>${t('Вся ваша земля.','All your fields.')}<br><em>${t('Одна ясная картина.','One clear picture.')}</em></h2>
+   <p>${t('Спутниковые слои, прогноз погоды и анализ каждого поля — от общей картины до конкретной точки.','Satellite layers, weather forecasts and field-by-field analysis — from the big picture down to a selected point.')}</p>
+   <div class="command-hero-actions"><button class="btn command-primary" onclick="tab('earth')">${t('Открыть карту','Explore map')} <span aria-hidden="true">↗</span></button><button class="btn command-secondary" onclick="S.scr='fieldEd';S.edit=null;S.pts=[];draw()">+ ${t('Добавить поле','Add field')}</button></div>
+  </div>
+  <div class="command-hero-visual" aria-hidden="true"><div class="orbit-orb"><i></i><i></i><i></i><span>✦</span></div><div class="command-orbit-tag">NASA POWER / OPEN-METEO</div></div>
+ </section>
+ <section class="command-stats" aria-label="${t('Ключевые показатели','Key metrics')}">
+  <div class="command-stat"><span class="stat-symbol">▦</span><span class="stat-label">${t('Мои поля','My fields')}</span><strong>${fs.length}</strong><small>${t('Контуры сохранены','Saved boundaries')}</small></div>
+  <div class="command-stat"><span class="stat-symbol">◈</span><span class="stat-label">${t('Площадь','Total area')}</span><strong>${number(area)} <small>ha</small></strong><small>${t('Приблизительный расчёт','Approximate polygon area')}</small></div>
+  <div class="command-stat"><span class="stat-symbol">◉</span><span class="stat-label">${t('Доступна история','Climate history')}</span><strong>${known}<small> / ${fs.length}</small></strong><small>${t('Региональные данные, не датчики','Regional data, not sensors')}</small></div>
+  <div class="command-stat"><span class="stat-symbol">↗</span><span class="stat-label">${t('Текущий регион','Farm region')}</span><strong class="stat-region">${esc((farm.region||'—').split(',')[0])}</strong><small>${t('Глобальное покрытие карты','Worldwide map coverage')}</small></div>
+ </section>
+ <div class="command-grid">
+  <section class="feature-panel command-map-section"><div class="command-section-header"><div><div class="section-eyebrow">01 / ${t('ГЕОДАННЫЕ','GEOSPATIAL')}</div><h2>${t('Карта хозяйства','Farm map')}</h2><p class="mut">${t('Контуры сохранённых участков · нажмите на поле','Your saved boundaries · select a field')}</p></div><button class="btn o s" onclick="tab('earth')">${t('На весь экран','Full map')} ↗</button></div>
+   <div class="command-map-shell"><div id="homeFarmMap" class="command-map" role="region" aria-label="${t('Карта полей','Field map')}"></div><div class="command-map-overlay"><span class="map-dot"></span>${t('Спутниковая подложка','Satellite basemap')}</div></div>
+   <div class="command-map-footer"><span><i class="map-legend-dot"></i>${t('Сохранённые поля','Saved fields')}</span><button class="mini-link" onclick="downloadFieldsGeoJSON()">↓ GeoJSON</button></div>
+  </section>
+  <section class="feature-panel command-insights"><div class="section-eyebrow">02 / ${t('РЕШЕНИЯ','ACTION CENTER')}</div><h2>${t('На что обратить внимание','What needs attention')}</h2><p class="mut">${t('Сигналы модели — повод проверить поле, не готовый диагноз.','Model-based signals suggest what to inspect; they are not diagnoses.')}</p>
+    <div class="command-signals">${signals.length?signals.map(item=>`<div class="command-signal ${item.kind}"><span class="signal-symbol">${item.kind==='warning'?'!':item.kind==='neutral'?'i':'↗'}</span><div><b>${esc(item.name)}</b><p>${esc(item.text)}</p><small>${esc(item.type)}</small></div></div>`).join(''):`<div class="command-signal clear"><span class="signal-symbol">✓</span><div><b>${t('Новых сигналов нет','No active signals')}</b><p>${t('Продолжайте регулярные осмотры участка.','Continue routine in-field checks.')}</p></div></div>`}</div>
+    <button class="btn o s command-insights-cta" onclick="tab('doctor')">${t('Проверка полей','Open Field Doctor')} ↗</button>
+  </section>
+  <section class="command-fields-section"><div class="command-section-header"><div><div class="section-eyebrow">03 / ${t('УЧАСТКИ','PARCELS')}</div><h2>${t('Ваши поля','Your fields')}</h2><p class="mut">${t('Актуальные параметры и история','Conditions and history at a glance')}</p></div><button class="btn o s" onclick="tab('fields')">${t('Все поля','View all')} ↗</button></div>
+    <div class="command-field-grid">${fs.slice(0,4).map(dashboardFieldCard).join('')}</div>
+    ${fs.length>4?`<button class="mini-link" onclick="tab('fields')">+ ${fs.length-4} ${t('остальных полей','more fields')} →</button>`:''}
+  </section>
+  <section class="command-side-stack"><div class="feature-panel command-mini-panel"><div class="section-eyebrow">04 / OPEN-METEO</div><div class="command-section-header"><h2>${t('Погода','Weather outlook')}</h2><button class="mini-link" onclick="tab('weather')">${t('7 дней','7 days')} ↗</button></div><div id="homeForecast"><p class="mut">${t('Загрузка прогноза…','Loading forecast…')}</p></div></div>
+    <div class="feature-panel command-mini-panel"><div class="section-eyebrow">05 / ${t('СООБЩЕСТВО','COMMUNITY')}</div><div class="command-section-header"><h2>${t('Фермерская сеть','Grower network')}</h2><button class="mini-link" onclick="tab('feed')">${t('Открыть','Open')} ↗</button></div><div id="homeFeed"><p class="mut">${t('Загрузка записей…','Loading updates…')}</p></div></div>
+  </section>
+ </div>
+ <p class="command-disclaimer">${t('Источники: NASA POWER — региональная климатическая оценка, Open-Meteo — прогноз модели. Условия конкретного участка требуют проверки на месте.','Sources: NASA POWER is regional climate context; Open-Meteo is modeled forecast. Conditions on a specific parcel require on-site verification.')}</p>
+ </div>`;
+}
 /* ---------- earth ---------- */
 function earth(){const d=new Date(Date.now()-10*864e5).toISOString().slice(0,10);
  return hdr('Earth','Нажми на выделенное поле → получи погоду и региональные NASA-данные для выбранной точки')+
