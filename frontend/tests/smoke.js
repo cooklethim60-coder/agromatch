@@ -47,5 +47,9 @@ assert(el('#main').innerHTML.includes('welcome-shell'),'Missing redesigned onboa
 vm.runInContext("S.scr='auth';draw()",context);
 assert(el('#main').innerHTML.includes('auth-form-pane'),'Missing responsive auth form');
 assert(el('#main').innerHTML.includes('toggleUiLanguage'),'Language switch inaccessible before login');
+const indexHtml=fs.readFileSync(path.join(root,'index.html'),'utf8');
+assert(indexHtml.includes('/static/studio.css'),'Studio stylesheet missing from HTML');
+assert(fs.existsSync(path.join(root,'studio.css')),'Studio stylesheet file missing');
+console.log('Studio stylesheet linked; all workflow and accessibility smoke checks passed');
 console.log('Studio UX smoke: dashboard, inspector, filtering, comparison, locale and onboarding OK');
 console.log(`Frontend static navigation smoke: ${checked}/13 sections rendered`);
