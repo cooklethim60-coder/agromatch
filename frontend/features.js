@@ -36,7 +36,44 @@ function shellNav(){
 function openMore(){ovOpen(`<h1>Explore AgroMatch</h1><p class="mut">Choose a workspace</p><div class="extra-menu">${NAV.map(x=>`<button onclick="closeOv();tab('${x.id}')">${ic(x.ico)}<span>${navLabel(x)}</span></button>`).join('')}</div><button class="btn o s language-mobile" onclick="toggleUiLanguage()">🌐 ${uiLanguage()==='ru'?'English':'Русский'}</button>`)}
 function selFieldHtml(action){return `<label>Selected field</label><select onchange="S.extraField=+this.value;${action}()">${S.me.fields.map(f=>`<option value="${f.id}" ${f.id===S.extraField?'selected':''}>${esc(f.name)} · ${f.area_ha} ha</option>`).join('')}</select>`}
 function ensureField(){if(!S.extraField||!S.me.fields.some(f=>f.id===S.extraField))S.extraField=S.me.fields[0]?.id||null;return S.extraField}
-function myFields(){return hdr('My Fields','Boundaries · soils · crop histories · satellites')+`<div class="section-eyebrow">MANAGED LAND · ${S.me.fields.length} FIELDS</div><div class="feature-grid">${S.me.fields.map(f=>{const s=f.snapshots[0],m=s?.metrics;return `<div class="field-tile"><div class="row sb"><div><div class="section-eyebrow">FIELD ${f.id}</div><h2>${esc(f.name)}</h2></div>${s?lvpill(s.level,s.harmony):''}</div><div class="mut">${f.area_ha} hectares · ${esc(f.soil||'Soil not recorded')}</div><div class="key-stats"><span>Rain / year <b>${m?.rain_mm??'—'} mm</b></span><span>Temperature <b>${m?.temp_c??'—'}°C</b></span></div><div class="mut source-line">${m?.simulated?tag('s'):tag('n')} ${m?.last_obs||'No observation date'}</div><div class="row tile-actions"><button class="btn s" onclick="ovField(${f.id})">Explore field</button><button class="btn o s" onclick="S.extraField=${f.id};tab('doctor')">Diagnosis</button></div></div>`}).join('')}</div><button class="btn o" onclick="S.scr='fieldEd';S.edit=null;S.pts=[];draw()">+ Draw a new field</button>`}
+
+function fieldsFiltered(){
+ let fields=[...(S.me?.fields||[])],query=String(S.fieldQuery||'').trim().toLowerCase();
+ if(query)fields=fields.filter(f=>(f.name+' '+(f.soil||'')+' '+(f.crops||[]).join(' ')).toLowerCase().includes(query));
+ switch(S.fieldSort){
+  case 'area-desc':fields.sort((a,b)=>(Number(b.area_ha)||0)-(Number(a.area_ha)||0));break;
+  case 'area-asc':fields.sort((a,b)=>(Number(a.area_ha)||0)-(Number(b.area_ha)||0));break;
+  default:fields.sort((a,b)=>String(a.name).localeCompare(String(b.name)));break;
+ }
+ return fields;
+}
+function fieldsListMarkup(){
+ const ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b,filtered=fieldsFiltered();
+ if(!filtered.length)return `<div class="fields-empty"><span aria-hidden="true">⌕</span><h3>${t('Поля не найдены','No matching fields')}</h3><p class="mut">${t('Попробуйте изменить запрос или сбросить поиск.','Try a different search or clear the filter.')}</p><button class="btn o s" onclick="S.fieldQuery='';const x=$('#fieldSearch');if(x)x.value='';renderFieldsList()">${t('Сбросить','Clear search')}</button></div>`;
+ return filtered.map(f=>{
+  const s=f.snapshots?.[0],m=s?.metrics||{};
+  return `<article class="field-tile field-management-card">
+   <div class="field-management-header"><span class="field-management-id">FIELD ${f.id}</span>${m.simulated?tag('s'):m.source?tag('n'):'<span class="mini-source">NO DATA</span>'}</div>
+   <h2>${esc(f.name)}</h2><p class="mut">${esc(f.soil||t('Почва не указана','Soil not specified'))} · ${Number(f.area_ha||0).toLocaleString(ru?'ru-RU':'en-US')} ha</p>
+   <div class="field-management-kpis"><div><small>${t('Осадки / период','Rain / period')}</small><strong>${m.rain_mm==null?'—':esc(m.rain_mm)+' mm'}</strong></div><div><small>${t('Средняя температура','Mean temperature')}</small><strong>${m.temp_c==null?'—':esc(m.temp_c)+' °C'}</strong></div></div>
+   <div class="field-management-footer"><button class="btn s" onclick="ovField(${f.id})">${t('Подробности','Details')} ↗</button><button class="btn o s" onclick="focusEarthField(${f.id})">${t('На карте','Map')} ⌖</button><button class="btn o s" onclick="S.extraField=${f.id};tab('doctor')">${t('Анализ','Analysis')}</button></div>
+  </article>`;
+ }).join('');
+}
+function renderFieldsList(){
+ const e=$('#fieldsResults');if(e)e.innerHTML=fieldsListMarkup();
+ const count=$('#fieldsVisibleCount');if(count)count.textContent=fieldsFiltered().length;
+}
+function myFields(){
+ const ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b,fields=S.me.fields||[];
+ return hdr(t('Мои поля','My fields'),t('Контуры, климат, культура и история участков','Boundaries, climate, crops and field histories'))+
+ `<div class="fields-management">
+ <div class="fields-management-hero"><div><div class="section-eyebrow">${t('ЗЕМЕЛЬНЫЙ БАНК','FIELD PORTFOLIO')}</div><h2>${fields.length} ${t('полей в хозяйстве','fields in your portfolio')}</h2><p>${t('Найдите нужный участок или перейдите к его координатам на карте.','Find any parcel, explore its history or jump to its map location.')}</p></div><div class="fields-management-actions"><button class="btn s" onclick="S.scr='fieldEd';S.edit=null;S.pts=[];draw()">+ ${t('Новое поле','Add field')}</button><button class="btn o s" onclick="downloadFieldsGeoJSON()">↓ GeoJSON</button></div></div>
+ <div class="fields-management-toolbar"><label for="fieldSearch">${t('Поиск по названию, почве, культуре','Search fields by name, soil or crop')}<input id="fieldSearch" type="search" placeholder="${t('Например: пшеница','e.g. wheat')}" value="${esc(S.fieldQuery||'')}" oninput="S.fieldQuery=this.value;renderFieldsList()"></label><label for="fieldSort">${t('Сортировка','Sort fields')}<select id="fieldSort" onchange="S.fieldSort=this.value;renderFieldsList()"><option value="name" ${S.fieldSort==='name'||!S.fieldSort?'selected':''}>${t('По названию','Name')}</option><option value="area-desc" ${S.fieldSort==='area-desc'?'selected':''}>${t('Площадь ↓','Area ↓')}</option><option value="area-asc" ${S.fieldSort==='area-asc'?'selected':''}>${t('Площадь ↑','Area ↑')}</option></select></label><span class="fields-result-count"><b id="fieldsVisibleCount">${fieldsFiltered().length}</b> / ${fields.length}</span></div>
+ <div class="fields-result-grid" id="fieldsResults">${fieldsListMarkup()}</div>
+ <p class="footnote">${t('Климатические показатели NASA POWER имеют региональное разрешение. Данные с пометкой SIMULATED не являются наблюдениями.','NASA POWER climate estimates are regional; SIMULATED values are not observations.')}</p>
+ </div>`;
+}
 function doctorPage(){ensureField();return hdr('Field Doctor','Evidence first · transparent diagnostics')+`<div class="feature-panel">${selFieldHtml('loadDoctor')}<div id="doctorResults" class="loading-region">Checking available observations…</div></div><div class="footnote">Not a medical-style diagnosis for crops. Rule-based indicators highlight potential problems; confirm them with field inspections.</div>`}
 async function loadDoctor(){if(!$('#doctorResults'))return;$('#doctorResults').innerHTML='<p class="mut">Analysing available data…</p>';await tryit(async()=>{const r=await api(`/fields/${S.extraField}/doctor`);if(!$('#doctorResults'))return;$('#doctorResults').innerHTML=`<div class="row sb"><h2>Field observations</h2><span class="tag f_">RULE-BASED</span></div>${r.findings.map(v=>`<div class="finding ${v.level}"><div class="row sb"><b>${esc(v.title)}</b><span class="mini-source">${esc(v.source)}</span></div><p><b>Evidence:</b> ${esc(v.evidence)}</p><p>${esc(v.interpretation)}</p><div class="recommend"><b>Recommended check:</b> ${esc(v.action)}</div></div>`).join('')}<p class="mut">${esc(r.limitations)}</p><div class="row"><button class="btn s" onclick="loadAiDoctor()">Generate AI interpretation</button><button class="btn o s" onclick="S.cop.field=S.extraField;S.cop.mode='do';tab('co')">Farm Copilot</button></div><div id="aiDoctorResult"></div>`})}
 async function loadAiDoctor(){const el=$('#aiDoctorResult');if(!el)return;el.innerHTML='<p class="mut">Asking the configured AI provider…</p>';
