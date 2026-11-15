@@ -196,9 +196,24 @@ async function loadSatellite(){const el=$('#satelliteResults');if(!el)return;con
 }catch(e){if(S.extraField===fieldId&&$('#satelliteResults'))el.innerHTML=`<div class="warn">${esc(e.message)}</div>`}}
 async function submitSatellite(){await tryit(async()=>{const product=$('#nasaProduct')?.value,layer=$('#nasaLayer')?.value;if(product&&!layer)throw new Error('Select a verified layer first');const x=await api(`/fields/${S.extraField}/satellite/tasks`,{b:product?{product,layer}:{}});toast('NASA extraction task submitted');await loadSatellite()})}
 async function refreshSatellite(id){await tryit(async()=>{const x=await api(`/fields/${S.extraField}/satellite/tasks/${id}/refresh`,{b:{}});toast('NASA task: '+x.status);await loadSatellite()})}
-async function loadHomePreview(){const fid=S.me.fields[0]?.id;if(!fid)return;
- try{const w=await api(`/fields/${fid}/weather`);if($('#homeForecast'))$('#homeForecast').innerHTML=`<div class="key-stats"><span>High today <b>${weatherNum(w.days[0]?.high,0,' °C')}</b></span><span>7-day rain <b>${(w.days.every(d=>d.rain!=null)?weatherNum(w.days.reduce((a,b)=>a+Number(b.rain),0),1,' мм'):'—')}</b></span></div>${w.warnings.length?`<p class="mut">${esc(w.warnings[0].text)}</p>`:'<p class="mut">No weather thresholds exceeded.</p>'}`;}catch(e){if($('#homeForecast'))$('#homeForecast').textContent='Forecast unavailable. Historical NASA data remains available.'}
- try{const feed=await api('/feed?limit=3');if($('#homeFeed'))$('#homeFeed').innerHTML=feed.length?feed.map(p=>`<p class="mut"><b>${esc(p.author)}</b>: ${esc(p.body.slice(0,100))}</p>`).join(''):'<p class="mut">No community posts yet.</p>';}catch(e){if($('#homeFeed'))$('#homeFeed').textContent='Community unavailable.'}
+async function loadHomePreview(){
+ const fid=S.me.fields[0]?.id;if(!fid)return;
+ const ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b;
+ try{
+  const w=await api(`/fields/${fid}/weather`),days=w.days||[],today=days[0]||{};
+  if($('#homeForecast')){
+   const rain=days.length&&days.every(d=>d.rain!=null)?weatherNum(days.reduce((a,d)=>a+Number(d.rain),0),1,' mm'):'—';
+   const outlook=w.warnings?.length?t('Проверьте погодные риски в полном прогнозе.','Review weather risks in the full forecast.'):t('Пороговые предупреждения не обнаружены.','No threshold alerts reported.');
+   $('#homeForecast').innerHTML=`<div class="home-weather-summary"><div class="home-weather-current"><span class="weather-symbol">${weatherIcon(today.code)}</span><strong>${weatherNum(today.high,0,' °C')}</strong><small>${t('Дневной максимум','Daytime high')}</small></div><div class="home-weather-metrics"><span>${t('Осадки за 7 дней','7-day rainfall')}<b>${rain}</b></span><span>${t('Мин. сегодня','Low today')}<b>${weatherNum(today.low,0,' °C')}</b></span></div></div><p class="home-weather-note">${outlook}</p><p class="home-weather-source">OPEN-METEO · ${t('Прогноз модели','Model forecast')} · ${esc(w.timezone||'UTC')}</p>`;
+  }
+ }catch(e){if($('#homeForecast'))$('#homeForecast').innerHTML='<p class="mut">'+t('Прогноз временно недоступен. Попробуйте позже.','Forecast currently unavailable. Try again later.')+'</p>'}
+ try{
+  const feed=await api('/feed?limit=3');
+  if($('#homeFeed'))$('#homeFeed').innerHTML=feed.length?feed.map(p=>{
+   const author=String(p.author||t('Фермер','Farmer'));
+   return `<div class="command-feed-item"><span class="command-feed-avatar">${esc(author[0]?.toUpperCase()||'F')}</span><div><b>${esc(author)}</b><p>${esc(String(p.body||'').slice(0,110))}</p></div></div>`;
+  }).join(''):'<p class="mut">'+t('Публикаций пока нет. Начните обсуждение в сообществе.','No updates yet. Start a conversation in the community.')+'</p>';
+ }catch(e){if($('#homeFeed'))$('#homeFeed').textContent=t('Сообщество временно недоступно.','Community currently unavailable.')}
 }
 function extraAfter(){if(S.scr!=='app')return;({home:loadHomePreview,doctor:loadDoctor,weather:loadWeather,feed:loadFeed,knowledge:loadKnowledge,earth:()=>{loadSatellite();loadEarthIntelligence()},music:loadSymphonyContext})[S.tab]?.()}
 
