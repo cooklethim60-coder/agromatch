@@ -149,14 +149,29 @@ function home(){
  </div>`;
 }
 /* ---------- earth ---------- */
-function earth(){const d=new Date(Date.now()-10*864e5).toISOString().slice(0,10);
- return hdr('Earth','Нажми на выделенное поле → получи погоду и региональные NASA-данные для выбранной точки')+
- `<div class="earth-search"><input id="eq" placeholder="Город или координаты: 43.24, 76.92" aria-label="Поиск места"><button class="btn s" onclick="tryit(async()=>{const g=await geocode($('#eq').value);maps.earth.flyTo({center:[g.lon,g.lat],zoom:13,pitch:45})})">Найти</button><button class="btn o s" onclick="zoomToMyFields()">Мои поля</button></div>
- <div class="earth-controls"><div class="section-eyebrow">СЛОЙ КАРТЫ</div><div id="lays" class="earth-layer-tabs">${Object.entries(LAY).map(([k,v])=>`<button class="chip ${k==S.layer?'on':''}" data-k="${k}" onclick="setLayer('${k}',$('#ed').value)">${esc(v.n)}</button>`).join('')}</div>
- <div class="earth-options"><label>Дата снимка <input type="date" id="ed" value="${d}" max="${new Date().toISOString().slice(0,10)}" onchange="setLayer(S.layer,this.value)"></label><button class="btn o s" onclick="const m=maps.earth;m.easeTo({pitch:m.getPitch()>10?0:60})">2D / 3D</button></div></div>
- <div class="earth-map-wrap"><div id="earth" class="map big"></div><div class="earth-map-hint">📍 Нажмите внутри зелёного контура своего поля, чтобы увидеть условия именно в выбранной точке.</div></div>
- <div id="esel" class="point-panel"><div class="feature-panel"><b>Выбери точку на поле</b><p class="mut">Показываются данные погодной модели и климатической сетки. Это не измерения датчика на участке.</p></div></div>
- <div id="einfo" class="card"></div>${satellitePanel()}`;
+function earth(){
+ const d=new Date(Date.now()-10*864e5).toISOString().slice(0,10);
+ const fields=S.me?.fields||[],ru=uiLanguage()==='ru',t=(a,b)=>ru?a:b;
+ return hdr(t('Карта и спутники','Satellite Earth'),t('Спутниковые слои, сохранённые поля и климатические условия выбранной точки','Imagery layers, saved parcels and climate context for selected coordinates'))+
+ `<section class="earth-studio">
+  <div class="earth-studio-toolbar">
+   <div class="earth-search"><label class="sr-only" for="eq">${t('Поиск места или координат','Search a place or coordinates')}</label><input id="eq" placeholder="${t('Город или координаты: 43.24, 76.92','Place or coordinates: 43.24, 76.92')}" aria-label="${t('Поиск места или координат','Search a place or coordinates')}"><button class="btn s" onclick="tryit(async()=>{const g=await geocode($('#eq').value);maps.earth.flyTo({center:[g.lon,g.lat],zoom:13,pitch:40})})">${t('Найти','Search')}</button><button class="btn o s" onclick="zoomToMyFields()">⌖ ${t('Мои поля','My fields')}</button></div>
+   <div class="earth-field-strip"><span class="earth-field-label">${t('Быстрый переход:','Jump to:')}</span>${fields.map(f=>`<button class="earth-field-pill" onclick="focusEarthField(${f.id})"><span class="map-legend-dot"></span>${esc(f.name)}</button>`).join('')}</div>
+  </div>
+  <div class="earth-controls">
+   <div class="earth-control-title"><div><div class="section-eyebrow">NASA / EARTH OBSERVATION</div><b>${t('Визуальные слои','Visual map layers')}</b></div><span class="earth-control-note">${t('Не числовые измерения','Not pixel measurements')}</span></div>
+   <div id="lays" class="earth-layer-tabs" role="group" aria-label="${t('Слои карты','Map layers')}">${Object.entries(LAY).map(([k,v])=>`<button class="chip ${k==S.layer?'on':''}" data-k="${k}" onclick="setLayer('${k}',$('#ed').value)">${esc(v.n)}</button>`).join('')}</div>
+   <div class="earth-options"><label>${t('Дата слоя','Layer date')} <input type="date" id="ed" value="${d}" max="${new Date().toISOString().slice(0,10)}" onchange="setLayer(S.layer,this.value)"></label><button class="btn o s" onclick="const m=maps.earth;m.easeTo({pitch:m.getPitch()>10?0:60})">◫ 2D / 3D</button></div>
+  </div>
+  <div class="earth-workspace-grid">
+   <div class="earth-workspace-map">
+    <div class="earth-map-wrap"><div id="earth" class="map big" role="region" aria-label="${t('Спутниковая карта полей','Satellite field map')}"></div><div class="earth-map-hint">↗ ${t('Нажмите внутри зелёного контура, чтобы получить условия для точки.','Click inside a green field boundary to inspect conditions at that point.')}</div></div>
+    <div id="einfo" class="earth-layer-info card"></div>
+   </div>
+   <aside id="esel" class="point-panel"><div class="feature-panel point-idle"><span class="point-idle-mark">⌖</span><div class="section-eyebrow">${t('ИНСПЕКТОР ТОЧКИ','POINT INSPECTOR')}</div><h2>${t('Выберите точку на карте','Select a point on the map')}</h2><p class="mut">${t('Кликните внутри сохранённого поля. Мы покажем прогноз и исторические региональные данные NASA для этих координат.','Click inside a saved field. The inspector shows a forecast and regional NASA history for those coordinates.')}</p><div class="point-idle-detail">Open-Meteo · NASA POWER</div><p class="footnote">${t('Прогноз и спутниковая сетка не заменяют локальные датчики и осмотр участка.','Forecasts and gridded data are not substitutes for sensors or field inspection.')}</p></div></aside>
+  </div>
+  <div class="earth-research-section"><div class="section-eyebrow">NASA / DATA EXTRACTION</div><h2>${t('Спутниковая лаборатория','Satellite data lab')}</h2><p class="mut">${t('Проверяйте наличие продуктов, даты и качество данных перед агрономическими выводами.','Verify product availability, dates and quality before drawing agronomic conclusions.')}</p>${satellitePanel()}</div>
+ </section>`;
 }
 function zoomToMyFields(){
  const fields=S.me?.fields||[],m=maps.earth;
