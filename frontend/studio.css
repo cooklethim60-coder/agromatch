@@ -357,3 +357,28 @@ button{font-family:inherit}
  .auth-form-inner{padding:20px 0}
  .auth-form-inner h1{font-size:29px}
 }
+
+
+/* Field comparison and language controls */
+.welcome-top-actions{display:flex;align-items:center;gap:20px}
+.auth-language{display:flex;justify-content:flex-end;margin-bottom:30px}
+.auth-language .mini-link{font-size:12px}
+.field-comparison{background:var(--card);border:1px solid var(--line);border-radius:17px;box-shadow:var(--am-elev);overflow:hidden}
+.field-comparison summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:820;padding:18px 20px;color:var(--ink)}
+.field-comparison summary::-webkit-details-marker{display:none}
+.field-comparison summary>span{width:28px;height:28px;display:grid;place-items:center;background:var(--sage2);color:#579167;border-radius:8px;font-size:18px}
+.field-comparison summary>small{margin-left:auto;color:var(--mut);font-size:10px;font-weight:550}
+.field-comparison summary:after{content:"⌄";font-size:17px;color:var(--mut)}
+.field-comparison[open] summary:after{content:"⌃"}
+#fieldComparisonResults{padding:0 20px 20px}
+.field-compare-inputs{display:grid;grid-template-columns:1fr 1fr;gap:12px;border-top:1px solid var(--line);padding-top:16px}
+.field-compare-inputs select{margin:7px 0 12px}
+.field-compare-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+.field-compare-table{border-collapse:collapse;width:100%;min-width:480px;font-size:12px;line-height:1.5}
+.field-compare-table th,.field-compare-table td{text-align:left;padding:12px 13px;border-bottom:1px solid var(--line);min-width:120px;overflow-wrap:anywhere}
+.field-compare-table thead th{background:var(--sage2);font-size:12px}
+.field-compare-table thead th div{margin-top:6px}
+.field-compare-table tbody th{font-size:11px;color:var(--mut);font-weight:650;width:34%}
+.field-compare-table tbody td{font-variant-numeric:tabular-nums;font-size:13px;font-weight:670}
+.field-compare-table tbody tr:last-child th,.field-compare-table tbody tr:last-child td{border-bottom:0}
+@media(max-width:650px){.welcome-top-actions{gap:9px}.field-comparison summary{flex-wrap:wrap}.field-comparison summary>small{width:100%;margin-left:37px}.field-compare-inputs{grid-template-columns:1fr;gap:0}}
