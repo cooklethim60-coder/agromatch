@@ -472,7 +472,7 @@ async def point_conditions(fid: int, b: MapPointIn, u=Depends(me)):
 @app.get('/api/fields/{fid}/weather')
 async def field_weather(fid:int,refresh:bool=False,u=Depends(me)):
     field=own_field(u,fid)
-    try: return await agro_services.forecast(field['lat'],field['lon'],refresh=refresh)
+    try: return await (agro_services.forecast(field['lat'],field['lon'],refresh=True) if refresh else agro_services.forecast(field['lat'],field['lon']))
     except Exception as e:raise HTTPException(503,f'Weather forecast unavailable: {type(e).__name__}')
 
 @app.get('/api/fields/{fid}/doctor')
