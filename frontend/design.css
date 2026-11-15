@@ -92,3 +92,27 @@ h1{font-size:27px;line-height:1.15;font-weight:730;letter-spacing:-.6px}h2{lette
 .weather-data-table tbody tr:last-child td{border-bottom:0}
 .weather-history{grid-template-columns:repeat(2,minmax(0,1fr))}
 @media(min-width:730px){.weather-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.weather-history{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+
+/* Interactive farm map and evidence-based point inspector */
+.earth-search{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:10px 0}
+.earth-search input{flex:1;min-width:180px;margin:0}
+.earth-controls{background:var(--sage2);border:1px solid var(--line);padding:12px;border-radius:15px;margin-bottom:12px}
+.earth-layer-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.earth-layer-tabs .chip{margin:0}
+.earth-options{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.earth-options label{font-size:12px;color:var(--mut)}
+.earth-options input{display:block;margin:4px 0 0;max-width:205px}
+.earth-map-wrap{position:relative;margin:10px 0 16px}
+.earth-map-hint{position:absolute;z-index:2;bottom:11px;left:11px;right:11px;max-width:520px;background:#142f24e8;color:#fff;padding:10px 13px;border-radius:12px;font-size:12px;pointer-events:none;line-height:1.45}
+.point-panel{margin:13px 0 20px;scroll-margin-top:90px}
+.earth-point-card h3{font-size:16px;margin:22px 0 10px}
+.earth-point-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0}
+.earth-point-metric{background:var(--sage2);border:1px solid var(--line);border-radius:13px;padding:13px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.earth-point-metric span{font-size:12px;color:var(--mut)}
+.earth-point-metric strong{font-size:clamp(18px,3vw,25px);font-weight:750;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.earth-point-metric small{color:var(--mut);font-size:11px;line-height:1.4}
+.earth-point-actions{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
+.earth-point-actions button{margin:0}
+@media(min-width:700px){.earth-point-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:480px){.earth-map-hint{font-size:11px}.earth-search .btn{padding:9px}}
