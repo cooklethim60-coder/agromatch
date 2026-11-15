@@ -382,3 +382,11 @@ button{font-family:inherit}
 .field-compare-table tbody td{font-variant-numeric:tabular-nums;font-size:13px;font-weight:670}
 .field-compare-table tbody tr:last-child th,.field-compare-table tbody tr:last-child td{border-bottom:0}
 @media(max-width:650px){.welcome-top-actions{gap:9px}.field-comparison summary{flex-wrap:wrap}.field-comparison summary>small{width:100%;margin-left:37px}.field-compare-inputs{grid-template-columns:1fr;gap:0}}
+
+/* Satellite time travel + overlay strength */
+.earth-timeline-actions{display:flex;align-items:center;gap:6px}
+.earth-opacity-control{display:flex;align-items:center;flex-wrap:wrap;column-gap:9px;max-width:230px;font-size:11px}
+.earth-opacity-control span{color:var(--ink);font-weight:750;font-variant-numeric:tabular-nums}
+.earth-opacity-control input[type=range]{display:block;width:150px;accent-color:#3c7c57;margin:4px 0;box-shadow:none;padding:0;border:0;min-width:80px}
+.earth-options>.btn{margin-left:auto}
+@media(max-width:700px){.earth-options>.btn{margin-left:0}.earth-opacity-control{max-width:185px}.earth-opacity-control input[type=range]{width:130px}}
